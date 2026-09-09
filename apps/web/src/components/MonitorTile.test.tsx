@@ -19,7 +19,7 @@ const monitor: DeskSnapshot['monitors'][number] = {
   inputs: [],
   controlPaths: [],
   preferredInputId: null,
-  placement: { x: 0, y: 0, width: 10, height: 10, orientation: 'landscape' },
+  placement: { x: 0, y: 0, width: 10, height: 10, orientation: 'landscape', autoPlaced: false },
 };
 
 function snapshotWith(

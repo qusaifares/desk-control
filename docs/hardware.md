@@ -135,29 +135,107 @@ they are independent).
 Only `MockPeripheralSwitchProvider` exists today. Real implementations will drive a switch from the
 controller host over GPIO, serial, or USB-HID — still control plane only.
 
-## Recommended next milestone: Windows DDC/CI
+## The Windows provider
 
-The gaming PC is the machine that matters most (it owns the high-refresh path, and it holds the live
-input at rest), and Windows has the most tractable API surface. A vertical slice for one real machine
-is worth more than three half-finished platforms.
+Implemented and verified against real monitors.
+
+**How it talks to hardware.** A long-lived `powershell.exe` process compiles a P/Invoke shim once at
+startup, then speaks one JSON object per line: `list`, `observe`, `getvcp`, `setvcp`. Underneath it
+is `EnumDisplayMonitors` → `GetPhysicalMonitorsFromHMONITOR` → the `dxva2.dll` VCP calls, with EDID
+from WMI `WmiMonitorID`.
+
+No native module, no compiler, no per-ABI prebuild, and nothing extra for ARM64. It also works
+unchanged from WSL, since `powershell.exe` is reachable there — which is how it was developed against
+a real desk.
+
+**Measured on real hardware:** ~8 s for the first `discoverMonitors()` (PowerShell startup plus the
+WMI query, paid once), ~120 ms for a warm `getObservedState()` across two monitors, ~550 ms for a
+`setInput()` including read-back verification. Comfortable against a 3 s observation interval.
+
+**Handles are never held across calls.** Physical monitor handles are invalidated by display topology
+changes, so every operation re-enumerates and looks the panel up by its device interface path.
+
+### Joining the two names Windows gives a monitor
+
+EDID lives in WMI, DDC handles come from the display API, and they identify the same panel
+differently:
+
+```
+WMI      DISPLAY\AUS276D\7&2d237c0c&0&UID16641_0
+Windows  \\?\DISPLAY#AUS276D#7&2d237c0c&0&UID16641#{e6f07b5f-ee97-...}
+```
+
+Both normalise to `display\aus276d\7&2d237c0c&0&uid16641`, making the join exact rather than a guess
+based on enumeration order — which matters the moment two identical monitors are on one desk.
+
+The stable id is then derived from EDID alone (`AUS` + `PA278CV` + `N6LMQS137321`), never from an
+adapter name or instance path, so a macOS agent looking at the same panel computes the same id and
+the controller merges the two control paths.
+
+### What real monitors actually did
+
+Two ASUS panels on one desk, and they disagreed in ways worth recording:
+
+- **Capability strings are not uniformly formatted.** One packs sections together
+  (`(prot(monitor)type(LCD)model(PA278CV)...`), the other sprinkles spaces
+  (`(prot(monitor) type(LCD)model(PA279CV) ...`). Both are parsed; neither is pattern-matched.
+- **They advertise different input sets.** `60(11 0F 10)` on one, `60(11 12 0F)` on the other. The
+  capabilities string is the only authority on which inputs exist.
+- **The VCP type field is not trustworthy.** Reading 0x60 returned type `1` (set-parameter) on one
+  panel and type `0` (momentary) on the other, for the same feature. Nothing branches on it, and the
+  `max` value from a read is ignored for the same reason.
+- **Both reported `Generic PnP Monitor`** as their description. Identity has to come from EDID.
+
+This is precisely why the provider parses capabilities, gates on them, and confirms every write by
+reading the panel back.
+
+### Verifying a switch
+
+`setInput()` writes VCP 0x60 and then re-reads until the deadline. Three outcomes:
+
+| Read-back says                        | Result                | Why                                                                                                         |
+| ------------------------------------- | --------------------- | ----------------------------------------------------------------------------------------------------------- |
+| the target input                      | success, verified     | the panel moved                                                                                             |
+| nothing — DDC stops answering         | success, unverified   | the normal signature of handing the panel to another computer: from this cable there is nothing left to ask |
+| a different input, until the deadline | failure `DEVICE_BUSY` | the write was accepted and ignored, which some panels do                                                    |
+
+The controller then asks the agent that just _gained_ the input to observe immediately, which is what
+closes the gap in case two.
+
+### Wiring inference, and its honest failure mode
+
+VCP 0x60 reports the monitor's globally selected input, not "the input you are asking down". When a
+panel answers at all it is almost always because it is displaying us, so the live input is taken to
+be this machine's cable. A monitor that keeps DDC alive on an inactive input will mislead this guess.
+
+That is what `wiringOverrides` in the desk config is for, and a user override always wins.
+
+### Not covered by the Windows provider
+
+Per-input mode data (`maxMode` stays `null` — DDC cannot report what a _different_ input would
+negotiate), brightness/power/volume operations (the capabilities are detected but no command kinds
+exist yet), and hotplug events (inventory refreshes on request, it does not subscribe to
+`WM_DISPLAYCHANGE`).
+
+## Recommended next milestone: macOS DDC
+
+The Windows path proves the abstraction end to end on one machine. The next thing that changes what
+the system can _do_ is a second platform, because that is when two agents see the same panel and the
+control-path merging, the active-input routing and the wiring discovery stop being theory.
 
 Scope:
 
-1. **Enumerate + identify** — `EnumDisplayMonitors` → `GetPhysicalMonitorsFromHMONITOR`, EDID via
-   SetupAPI or WMI (`WmiMonitorID`). Produce the same `stableId` the simulator produces.
-2. **Capabilities** — `GetCapabilitiesStringLength` / `CapabilitiesRequestAndCapabilitiesReply`,
-   parsing the VCP list for `60` and its supported values. Map those to `MonitorCapability`.
-3. **Observe** — `GetVCPFeatureAndVCPFeatureReply(0x60)` for the active input; treat a failure as
-   `unreachable`, never as "unchanged".
-4. **Switch** — `SetVCPFeature(0x60, value)`, then re-read to confirm. Do not report success on the
-   write alone.
-5. **Bindings** — `koffi` or `ffi-napi` against `dxva2.dll`, or a small helper executable. Prefer
-   whichever keeps the agent installable without a compiler.
+1. **Enumerate + identify** — `CGGetOnlineDisplayList`, EDID via `IODisplayCreateInfoDictionary` /
+   the `IODisplayEDID` property. Produce the same `stableId` the Windows provider produces for the
+   same panel; that equality is the whole point and deserves a test.
+2. **DDC transport** — I2C over `IOAVService` on Apple Silicon (`IOAVServiceWriteI2C` /
+   `IOAVServiceReadI2C`), which is a different path from Intel Macs' `IOFramebufferI2C`. An M4 and an
+   M2 MacBook will both take the Apple Silicon path.
+3. **Bridge** — a small Swift or Objective-C helper speaking the same JSON line protocol the
+   PowerShell bridge uses, so the Node side is nearly identical.
+4. **Expect** — DDC over USB-C/Thunderbolt docks frequently does not work at all. Reporting
+   `unreachable` honestly is a correct outcome, not a bug to paper over.
 
-Definition of done: run `apps/agent --provider windows-ddc` on the real gaming PC, see its real
-monitors appear in the existing UI beside simulated ones, and switch a real panel from the browser
-with the observed state confirmed by reading the hardware back.
-
-Expect to discover: monitors that report a capability and then refuse it, vendor input values outside
-the conventional set, and DDC calls that hang. All three are reasons the abstraction was built the
-way it is.
+Definition of done: the M4 MacBook and this Windows PC both register agents, the controller merges
+them into one monitor with two control paths, and a switch initiated from either machine is routed
+through whichever agent currently holds the live input.

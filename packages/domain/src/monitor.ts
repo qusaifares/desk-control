@@ -63,6 +63,12 @@ export const PlacementSchema = z.object({
   width: z.number().positive(),
   height: z.number().positive(),
   orientation: OrientationSchema.default('landscape'),
+  /**
+   * True when the controller placed this monitor itself because the user had
+   * not arranged it yet. The UI can invite the user to move it; nothing else
+   * treats it differently.
+   */
+  autoPlaced: z.boolean().default(false),
 });
 export type Placement = z.infer<typeof PlacementSchema>;
 

@@ -138,16 +138,33 @@ than on command status where both are available.
 
 ## Running an agent on a real machine
 
-```bash
-pnpm --filter @desk-control/agent build
-```
+First, check the machine can actually drive DDC. `probe` only reads; it never changes an input:
 
 ```bash
-node apps/agent/dist/index.js --controller ws://192.168.1.10:7420/agent --provider windows-ddc
+pnpm --filter @desk-control/agent exec tsx src/index.ts probe
 ```
 
-This currently exits with a clear message: the platform providers are stubs. See the end of
-[hardware.md](hardware.md) for what implementing one involves.
+Then point it at a controller:
+
+```bash
+pnpm --filter @desk-control/agent exec tsx src/index.ts --controller ws://192.168.1.10:7420/agent
+```
+
+The provider is chosen automatically: `windows-ddc` on Windows **and under WSL** (where the displays
+belong to Windows and the bridge reaches them through `powershell.exe`). Override with `--provider`.
+macOS and Linux still exit with a clear message — those providers are stubs.
+
+Real monitors are auto-placed in a row on the desk map, marked `autoPlaced`, ready to be arranged.
+
+### First-run config
+
+The controller seeds an **empty** desk by default — no invented monitors, no fictional presets. The
+dev environment passes `--seed example` to get the simulated four-monitor desk instead. Use a
+separate data directory to keep a real desk apart from the simulated one:
+
+```bash
+DESK_CONTROL_DATA_DIR=.data-real pnpm --filter @desk-control/controller exec tsx src/index.ts
+```
 
 ## Raspberry Pi notes
 

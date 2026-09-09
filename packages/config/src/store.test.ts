@@ -2,6 +2,7 @@ import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { emptyDeskConfig } from './empty-desk.js';
 import { exampleDeskConfig } from './example-desk.js';
 import { DeskConfigSchema } from './schema.js';
 import { InvalidConfigError, JsonFileConfigStore } from './store.js';
@@ -52,5 +53,16 @@ describe('example desk seed data', () => {
         expect(placed.has(monitorId)).toBe(true);
       }
     }
+  });
+});
+
+describe('empty desk seed', () => {
+  it('invents nothing: no monitors, no presets, no names', () => {
+    const config = emptyDeskConfig();
+    expect(() => DeskConfigSchema.parse(config)).not.toThrow();
+    expect(config.presets).toEqual([]);
+    expect(config.layout.placements).toEqual({});
+    expect(config.customNames.monitors).toEqual({});
+    expect(config.peripherals).toEqual([]);
   });
 });

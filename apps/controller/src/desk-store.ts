@@ -201,6 +201,8 @@ export class DeskStore {
         requiresActiveInput: report.requiresActiveInput,
       });
 
+      this.ensurePlacement(report.stableId);
+
       const monitor: Monitor = {
         id: report.stableId,
         kind: 'monitor',
@@ -217,6 +219,42 @@ export class DeskStore {
       this.monitors.set(monitor.id, monitor);
     }
     this.touch();
+  }
+
+  /**
+   * Gives a newly discovered monitor somewhere to live on the desk map.
+   *
+   * Without this, a real desk starts with an empty map and every monitor listed
+   * as "not placed yet", which is useless on a touchscreen. Auto-placement lays
+   * them out in a row and marks them, so the first thing the user does is drag
+   * them into the right shape rather than build the desk from nothing.
+   *
+   * A placement the user has already made is never overwritten.
+   */
+  private ensurePlacement(monitorId: string): void {
+    if (this.config.layout.placements[monitorId]) return;
+
+    const existing = Object.values(this.config.layout.placements);
+    const width = 16;
+    const height = 9;
+    const gap = 1;
+    const nextX = existing.reduce((rightEdge, placement) => {
+      return Math.max(rightEdge, placement.x + placement.width + gap);
+    }, 0);
+
+    this.config.layout.placements[monitorId] = {
+      x: nextX,
+      y: 0,
+      width,
+      height,
+      orientation: 'landscape',
+      autoPlaced: true,
+    };
+
+    this.config.layout.grid = {
+      columns: Math.max(this.config.layout.grid.columns, nextX + width),
+      rows: Math.max(this.config.layout.grid.rows, height),
+    };
   }
 
   /**

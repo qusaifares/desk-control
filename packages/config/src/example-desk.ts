@@ -248,6 +248,7 @@ const EXAMPLE_LAYOUT: DeskLayout = {
       width: 7,
       height: 17.5,
       orientation: 'portrait-left',
+      autoPlaced: false,
     },
     [EXAMPLE_MONITOR_IDS.topLandscape]: {
       x: 8,
@@ -255,6 +256,7 @@ const EXAMPLE_LAYOUT: DeskLayout = {
       width: 17,
       height: 9.5,
       orientation: 'landscape',
+      autoPlaced: false,
     },
     [EXAMPLE_MONITOR_IDS.bottomLandscape]: {
       x: 8,
@@ -262,6 +264,7 @@ const EXAMPLE_LAYOUT: DeskLayout = {
       width: 17,
       height: 9.5,
       orientation: 'landscape',
+      autoPlaced: false,
     },
     [EXAMPLE_MONITOR_IDS.rightPortrait]: {
       x: 26,
@@ -269,6 +272,7 @@ const EXAMPLE_LAYOUT: DeskLayout = {
       width: 7,
       height: 17.5,
       orientation: 'portrait-right',
+      autoPlaced: false,
     },
   },
 };

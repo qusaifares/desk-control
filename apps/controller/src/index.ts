@@ -1,4 +1,9 @@
-import { exampleDeskConfig, JsonFileConfigStore, type DeskConfig } from '@desk-control/config';
+import {
+  emptyDeskConfig,
+  exampleDeskConfig,
+  JsonFileConfigStore,
+  type DeskConfig,
+} from '@desk-control/config';
 import { InMemoryDiscoveryRegistry, NoopControllerAdvertiser } from '@desk-control/discovery';
 import type { ControllerInfo } from '@desk-control/domain';
 import { MockPeripheralSwitchProvider, type SimulatedSwitchSpec } from '@desk-control/hardware';
@@ -33,6 +38,19 @@ function switchSpecsFromConfig(config: DeskConfig): SimulatedSwitchSpec[] {
   });
 }
 
+/**
+ * Which config to write on first run.
+ *
+ * Defaults to an empty desk, because a real installation must not be seeded
+ * with a desk that does not exist. `--seed example` is what the simulator-based
+ * dev environment uses.
+ */
+function seedConfig(): DeskConfig {
+  const index = process.argv.indexOf('--seed');
+  const seed = index === -1 ? 'empty' : process.argv[index + 1];
+  return seed === 'example' ? exampleDeskConfig() : emptyDeskConfig();
+}
+
 async function main(): Promise<void> {
   const config = loadControllerConfig();
   const logger = createLogger(config.logLevel);
@@ -42,10 +60,10 @@ async function main(): Promise<void> {
 
   let deskConfig: DeskConfig;
   try {
-    deskConfig = (await configStore.load()) ?? exampleDeskConfig();
+    deskConfig = (await configStore.load()) ?? seedConfig();
   } catch (error) {
-    logger.error({ error: (error as Error).message }, 'Falling back to the example desk config');
-    deskConfig = exampleDeskConfig();
+    logger.error({ error: (error as Error).message }, 'Falling back to a freshly seeded config');
+    deskConfig = seedConfig();
   }
   await configStore.save(deskConfig);
 

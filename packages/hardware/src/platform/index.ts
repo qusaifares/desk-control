@@ -1,13 +1,14 @@
 import type { MonitorControlProvider } from '../monitor-control-provider.js';
+import { WindowsDdcMonitorControlProvider } from './windows/windows-ddc-provider.js';
 
 /**
- * Real platform providers are deliberately not implemented in this bootstrap.
+ * Platform providers.
  *
- * Each will be a self-contained module implementing MonitorControlProvider:
- *   windows  ->  DDC/CI via SetVCPFeature/GetVCPFeature (dxva2.dll) or
- *                MonitorConfiguration API, EDID from SetupAPI/WMI
- *   macos    ->  DDC over I2C via IOKit / CoreDisplay, EDID from IODisplay
- *   linux    ->  ddcutil (i2c-dev), EDID from /sys/class/drm/*\/edid
+ *   windows  ->  implemented: DDC/CI via dxva2.dll, EDID from WMI
+ *   macos    ->  not implemented: DDC over I2C via IOKit / CoreDisplay,
+ *                EDID from IODisplay
+ *   linux    ->  not implemented: ddcutil (i2c-dev),
+ *                EDID from /sys/class/drm/*\/edid
  *
  * The important property is that adding one changes nothing above this file.
  */
@@ -24,5 +25,6 @@ export class PlatformProviderNotImplementedError extends Error {
 }
 
 export function createPlatformProvider(kind: PlatformProviderKind): MonitorControlProvider {
+  if (kind === 'windows-ddc') return new WindowsDdcMonitorControlProvider();
   throw new PlatformProviderNotImplementedError(kind);
 }

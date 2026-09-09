@@ -130,7 +130,34 @@ docs/
 - [docs/development.md](docs/development.md) — environment, workflows, simulator control API
 - [CLAUDE.md](CLAUDE.md) — invariants and conventions for future work in this repo
 
+## Real hardware
+
+The Windows provider is real. On a Windows machine (or WSL on one — the DDC bridge reaches the
+displays either way):
+
+```bash
+pnpm --filter @desk-control/agent exec tsx src/index.ts probe
+```
+
+```
+AUS PA278CV
+  stable id    monitor:aus:pa278cv:n6lmqs137321
+  identity     AUS PA278CV · serial N6LMQS137321
+  capabilities brightness, contrast, input-switch, power, read-active-input, volume
+  inputs       HDMI 1 (0x11)
+               DisplayPort 1 (0x0f)  <- this machine
+               DisplayPort 2 (0x10)
+  live input   input-0x0f
+```
+
+Point an agent at a controller and its real monitors appear on the desk map, auto-placed and ready
+to arrange:
+
+```bash
+pnpm --filter @desk-control/agent exec tsx src/index.ts --controller ws://127.0.0.1:7420/agent
+```
+
 ## Next milestone
 
-Real Windows DDC/CI monitor discovery and input switching — see the end of
+macOS DDC, so a MacBook becomes both a source and a control path — see the end of
 [docs/hardware.md](docs/hardware.md).

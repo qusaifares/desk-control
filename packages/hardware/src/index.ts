@@ -4,3 +4,7 @@ export * from './mock/simulated-desk.js';
 export * from './mock/mock-monitor-control-provider.js';
 export * from './mock/mock-peripheral-switch-provider.js';
 export * from './platform/index.js';
+export * from './platform/windows/capabilities.js';
+export * from './platform/windows/device-id.js';
+export * from './platform/windows/powershell-bridge.js';
+export * from './platform/windows/windows-ddc-provider.js';

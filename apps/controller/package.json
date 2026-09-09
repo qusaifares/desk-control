@@ -5,7 +5,7 @@
   "type": "module",
   "main": "./src/index.ts",
   "scripts": {
-    "dev": "tsx watch src/index.ts",
+    "dev": "tsx watch src/index.ts --seed example",
     "start": "node dist/index.js",
     "build": "tsup",
     "test": "vitest run",

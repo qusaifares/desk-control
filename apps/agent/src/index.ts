@@ -9,9 +9,10 @@ import {
 } from '@desk-control/domain';
 import {
   createPlatformProvider,
+  isWsl,
+  MockMonitorControlProvider,
   PlatformProviderNotImplementedError,
   SimulatedDesk,
-  MockMonitorControlProvider,
   type MonitorControlProvider,
   type PlatformProviderKind,
 } from '@desk-control/hardware';
@@ -38,6 +39,9 @@ const EnvSchema = z.object({
 });
 
 function detectPlatform(): Platform {
+  // A WSL agent controls Windows monitors, so it reports itself as Windows.
+  if (isWsl()) return 'windows';
+
   switch (osPlatform()) {
     case 'win32':
       return 'windows';
@@ -51,6 +55,11 @@ function detectPlatform(): Platform {
 }
 
 function defaultProviderKind(platform: Platform): PlatformProviderKind {
+  // Under WSL the displays belong to Windows, and the DDC bridge reaches them
+  // through powershell.exe. Treating this as a Linux host would send us looking
+  // for ddcutil on i2c buses that do not exist here.
+  if (isWsl()) return 'windows-ddc';
+
   switch (platform) {
     case 'windows':
       return 'windows-ddc';
@@ -80,8 +89,56 @@ function parseArgs(argv: string[]): Record<string, string> {
   return result;
 }
 
+/**
+ * `desk-control-agent probe` - enumerate this machine's monitors and exit.
+ *
+ * The fastest way to find out whether a machine can actually drive DDC before
+ * wiring it into a desk, and the first thing to reach for when a monitor
+ * misbehaves. It only reads; it never changes an input.
+ */
+async function probe(provider: MonitorControlProvider): Promise<void> {
+  const monitors = await provider.discoverMonitors();
+  if (monitors.length === 0) {
+    console.log('No monitors could be reached over DDC/CI.');
+    return;
+  }
+
+  const observed = await provider.getObservedState();
+  const byId = new Map(observed.map((entry) => [entry.stableId, entry]));
+
+  for (const monitor of monitors) {
+    const state = byId.get(monitor.stableId);
+    console.log(`\n${monitor.detectedName}`);
+    console.log(`  stable id    ${monitor.stableId}`);
+    console.log(
+      `  identity     ${monitor.identity.manufacturerId} ${monitor.identity.model}` +
+        `${monitor.identity.serial ? ` \u00b7 serial ${monitor.identity.serial}` : ' \u00b7 no serial'}` +
+        `${monitor.identity.weakIdentity ? '  (WEAK - confirm mapping)' : ''}`,
+    );
+    console.log(`  capabilities ${monitor.capabilities.join(', ') || 'none reported'}`);
+    console.log(
+      `  inputs       ${monitor.inputs
+        .map(
+          (input) =>
+            `${input.detectedName} (0x${input.ddcInputSourceValue?.toString(16).padStart(2, '0')})` +
+            `${input.id === monitor.connectedViaInputId ? '  <- this machine' : ''}`,
+        )
+        .join('\n               ')}`,
+    );
+    console.log(
+      `  live input   ${
+        state?.reachability === 'reachable'
+          ? state.activeInputId
+          : `unreadable (${state?.error?.message ?? 'unknown'})`
+      }`,
+    );
+  }
+  console.log('');
+}
+
 async function main(): Promise<void> {
   const env = EnvSchema.parse(process.env);
+  const positional = process.argv.slice(2).filter((token) => !token.startsWith('--'));
   const args = parseArgs(process.argv.slice(2));
 
   const logger = pino({
@@ -119,7 +176,14 @@ async function main(): Promise<void> {
     }
   }
 
-  const capabilities: ComputerCapability[] = ['ddc-control', 'report-active-display'];
+  if (positional[0] === 'probe') {
+    await probe(provider);
+    await provider.dispose?.();
+    return;
+  }
+
+  const capabilities: ComputerCapability[] =
+    providerKind === 'mock' ? ['report-active-display'] : ['ddc-control', 'report-active-display'];
   const controllerUrl = new URL(args.controller ?? env.DESK_CONTROL_URL);
 
   const runtime = new AgentRuntime({

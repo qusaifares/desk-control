@@ -50,6 +50,7 @@ anything near providers.
 ```bash
 pnpm install
 pnpm dev          # controller (7420) + web (5173) + simulated desk (7430)
+pnpm --filter @desk-control/agent exec tsx src/index.ts probe   # real monitors on this machine
 pnpm test
 pnpm lint
 pnpm typecheck
@@ -109,13 +110,34 @@ packages/test-utils Fixture builders, waitFor
 
 ## Current state
 
-Everything works end to end against simulated hardware. Real DDC/CI (Windows, macOS, Linux) and real
-USB switch control are **not implemented** — `createPlatformProvider()` throws by design. mDNS is
-interface-only; static discovery is in use. Authentication is an optional shared token; the pairing
-design is in `docs/protocol.md`.
+Everything works end to end against simulated hardware, and **the Windows DDC/CI provider is real and
+verified against physical monitors** — discovery, EDID identity, capability parsing, input switching
+with read-back verification.
 
-Next milestone: real Windows DDC/CI discovery and input switching. Scope is at the end of
-`docs/hardware.md`.
+macOS and Linux providers are still stubs that throw. Real USB switch control is still simulated.
+mDNS is interface-only; static discovery is in use. Authentication is an optional shared token; the
+pairing design is in `docs/protocol.md`.
+
+Next milestone: macOS DDC, so two agents see the same panel and control-path merging is exercised for
+real. Scope is at the end of `docs/hardware.md`.
+
+### Working on the Windows provider
+
+It lives in `packages/hardware/src/platform/windows/`. The DDC calls go through a long-lived
+`powershell.exe` process speaking one JSON object per line — no native module, and it works from WSL
+as well as native Windows, which is how it is tested.
+
+- `ddc-bridge-script.ts` holds the PowerShell source as a `String.raw` template. Do not use backticks
+  or `${` in it.
+- `capabilities.ts` parses the MCCS capabilities string. Two real strings are in its tests; add
+  captured strings rather than invented ones when fixing a parsing bug.
+- Never trust the `type` or `max` fields from a VCP read — real panels disagree about both. The
+  capabilities string is the only authority on which inputs exist.
+- Every write is confirmed by reading the panel back. Losing DDC after a write counts as success
+  (the panel was handed to another machine); a read that keeps showing another input is a failure.
+
+`pnpm --filter @desk-control/agent exec tsx src/index.ts probe` enumerates the real monitors on the
+current machine without changing anything.
 
 ## Out of scope for now
 
