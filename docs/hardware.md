@@ -185,6 +185,14 @@ Two ASUS panels on one desk, and they disagreed in ways worth recording:
   panel and type `0` (momentary) on the other, for the same feature. Nothing branches on it, and the
   `max` value from a read is ignored for the same reason.
 - **Both reported `Generic PnP Monitor`** as their description. Identity has to come from EDID.
+- **One of them answers DDC on an _inactive_ input.** Switched from HDMI 2 to DisplayPort 1 with
+  nothing on DisplayPort 1, the panel kept replying over the HDMI cable and reported its new input
+  correctly. So `requiresActiveInput: true` is a conservative default, not a law - see below.
+- **Read-back can be transiently wrong during re-sync.** Immediately after a switch a panel may
+  answer with the previous value for a moment before settling. This is why verification polls until
+  the deadline rather than reading once.
+
+Measured on the real switch: write plus verified read-back in ~560 ms.
 
 This is precisely why the provider parses capabilities, gates on them, and confirms every write by
 reading the panel back.
@@ -201,6 +209,19 @@ reading the panel back.
 
 The controller then asks the agent that just _gained_ the input to observe immediately, which is what
 closes the gap in case two.
+
+### `requiresActiveInput` is a conservative guess
+
+Real measurement above showed a panel happily answering DDC while displaying a different input. The
+provider still reports `requiresActiveInput: true`, because the asymmetry favours it: being wrong
+this way costs a refused command with a clear reason, while being wrong the other way sends commands
+into a void and reports success that never happened.
+
+The cost only bites with more than one agent on a monitor, where it needlessly narrows
+`selectControlPath()` to the machine holding the live input. The fix is to _learn_ the answer rather
+than widen the guess: after a successful switch away, if the agent can still read the panel, that
+monitor demonstrably does not require the active input. That belongs with the macOS milestone below,
+which is the point at which two agents first share a panel.
 
 ### Wiring inference, and its honest failure mode
 
@@ -235,6 +256,9 @@ Scope:
    PowerShell bridge uses, so the Node side is nearly identical.
 4. **Expect** — DDC over USB-C/Thunderbolt docks frequently does not work at all. Reporting
    `unreachable` honestly is a correct outcome, not a bug to paper over.
+5. **Learn `requiresActiveInput`** — with two agents on one panel this stops being academic. After a
+   successful switch away, an agent that can still read the monitor has proved the flag false for
+   that panel; record it so `selectControlPath()` can use either machine.
 
 Definition of done: the M4 MacBook and this Windows PC both register agents, the controller merges
 them into one monitor with two control paths, and a switch initiated from either machine is routed

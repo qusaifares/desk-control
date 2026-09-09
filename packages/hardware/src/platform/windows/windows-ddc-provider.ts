@@ -18,7 +18,11 @@ import {
   normalizeDeviceKey,
   type WindowsEdidRecord,
 } from './device-id.js';
-import { type BridgeRequestError, PowerShellDdcBridge, type DdcBridge } from './powershell-bridge.js';
+import {
+  type BridgeRequestError,
+  PowerShellDdcBridge,
+  type DdcBridge,
+} from './powershell-bridge.js';
 
 interface ListResponse {
   monitors: Array<{
