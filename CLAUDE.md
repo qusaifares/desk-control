@@ -89,8 +89,8 @@ Read `docs/design-system.md` before touching `apps/web`. Two rules, and they are
 
 - **Never hardcode a visual value** - no hex colours, pixel radii, font sizes or durations in
   feature code. Add a token to `apps/web/src/design/tokens.css` if nothing fits.
-- **Compose primitives** (`Panel`, `ListRow`, `Tile`, `Chip`, `StatusDot`, `Sheet`, `AppShell`) from
-  `design/index.js` rather than writing markup. The `ds-*` classes back those components; feature
+- **Compose primitives** (`Panel`, `ListRow`, `Tile`, `Chip`, `StatusDot`, `Sheet`, `Slider`,
+  `TextField`, `AppShell`) from `design/index.js` rather than writing markup. The `ds-*` classes back those components; feature
   code should not use them directly.
 
 Also specific to this product:
@@ -102,6 +102,9 @@ Also specific to this product:
   touchscreen.
 - Controls for things that do not exist yet are rendered disabled with the reason attached, never
   hidden and never wired to a no-op. `QuickActions` is the worked example.
+- An agent whose `providerKind` is `mock` is badged **Simulated** in the UI. Mock hardware sitting
+  beside real hardware is otherwise impossible to tell apart, which is exactly how a simulated desk
+  gets mistaken for a real one.
 
 ## Conventions
 

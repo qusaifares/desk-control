@@ -153,7 +153,15 @@ export function App() {
         />
       ) : null}
 
-      {systemOpen ? <SystemSheet snapshot={snapshot} onClose={() => setSystemOpen(false)} /> : null}
+      {systemOpen ? (
+        <SystemSheet
+          snapshot={snapshot}
+          onClose={() => setSystemOpen(false)}
+          onRenameComputer={(computerId, customName) =>
+            void run(() => deskApi.rename('computer', computerId, customName))
+          }
+        />
+      ) : null}
     </>
   );
 }

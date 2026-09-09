@@ -113,6 +113,16 @@ not touch the video path and the UI must not imply that it does.
 request appears as a separate `→ target` line, a stale reading is shown visibly marked as stale, and
 nothing is ever optimistically rendered as done. See `MonitorTile`.
 
+## Renaming, everywhere
+
+Every renameable entity follows one shape: a `TextField` whose `placeholder` is the _detected_ name,
+whose value is the `customName`, and whose Clear action sets `customName` back to `null`. The
+detected name is never overwritten and the entity's identity is never touched — a rename is
+presentation only.
+
+Monitors are renamed in Edit desk; computers in the system sheet. Both call the same
+`/api/desk/name` endpoint.
+
 ## Testing
 
 `src/test/fixtures.ts` builds a valid `DeskSnapshot` so a test states only what it cares about.
