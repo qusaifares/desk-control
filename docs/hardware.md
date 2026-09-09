@@ -231,6 +231,35 @@ be this machine's cable. A monitor that keeps DDC alive on an inactive input wil
 
 That is what `wiringOverrides` in the desk config is for, and a user override always wins.
 
+### Brightness and power
+
+Both are implemented and verified on real panels.
+
+**Brightness** is VCP 0x10. The value is scaled to whatever range the monitor reports as its
+maximum rather than assumed to be 0–100, and the write is confirmed by reading back with a small
+tolerance, because panels quantise to their own internal steps.
+
+**Power** is VCP 0xD6, and it is the clearest example of why capabilities are read rather than
+assumed. The two panels on this desk advertise different states:
+
+```
+PA278CV   on=0x01  standby=0x04  off=0x05
+PA279CV   on=0x01  standby=unsupported  off=0x05
+```
+
+So the API takes a _named_ state — `on`, `standby`, `off` — and the provider resolves it against
+the values that particular monitor actually lists, preferring the closest match and refusing with
+`CAPABILITY_UNSUPPORTED` when there is none. Asking the PA279CV for standby is honestly declined
+instead of being silently turned into something else.
+
+Turning a panel off usually ends the DDC conversation, so a lost connection after the write counts
+as success — the same rule as an input handover.
+
+**Polling cost.** Brightness and power each cost an extra DDC round trip, and real panels get
+unreliable when polled hard. They also only change when something asks them to, so they are re-read
+on one sweep in four and immediately after a command that sets them. In between, the last genuine
+reading is reported — stale, not invented.
+
 ### Not covered by the Windows provider
 
 Per-input mode data (`maxMode` stays `null` — DDC cannot report what a _different_ input would

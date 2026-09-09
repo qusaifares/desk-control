@@ -34,6 +34,8 @@ export interface SimulatedMonitorSpec {
   requiresActiveInput: boolean;
   /** How long the panel takes to re-sync after an input change. */
   switchDelayMs: number;
+  /** Percentage, when the panel supports brightness. */
+  brightness?: number;
 }
 
 export type SimulatedFault =
@@ -45,6 +47,8 @@ export interface SimulatedMonitor extends SimulatedMonitorSpec {
   /** Set while a switch is in progress; the panel is between inputs. */
   switchingToInputId: string | null;
   fault: SimulatedFault | null;
+  currentBrightness: number;
+  currentPowerState: 'on' | 'standby' | 'off';
 }
 
 export interface SwitchOutcome {
@@ -67,6 +71,8 @@ export class SimulatedDesk {
         inputs: spec.inputs.map((input) => ({ ...input })),
         switchingToInputId: null,
         fault: null,
+        currentBrightness: spec.brightness ?? 60,
+        currentPowerState: 'on',
       });
     }
   }
@@ -206,6 +212,59 @@ export class SimulatedDesk {
     monitor.switchingToInputId = null;
     this.emit();
     return this.finish(args.commandId, { ok: true });
+  }
+
+  /** Applies a brightness change, gated on the capability the panel reports. */
+  setBrightness(stableId: string, brightness: number): SwitchOutcome {
+    const monitor = this.monitors.get(stableId);
+    if (!monitor) {
+      return {
+        ok: false,
+        error: { code: 'UNKNOWN_TARGET', message: 'No such monitor', retryable: false },
+      };
+    }
+    if (!monitor.capabilities.includes('brightness')) {
+      return {
+        ok: false,
+        error: {
+          code: 'CAPABILITY_UNSUPPORTED',
+          message: `${monitor.detectedName} does not support brightness`,
+          retryable: false,
+        },
+      };
+    }
+    if (monitor.fault?.mode === 'unreachable') {
+      return {
+        ok: false,
+        error: { code: monitor.fault.code, message: monitor.fault.message, retryable: true },
+      };
+    }
+    monitor.currentBrightness = Math.max(0, Math.min(100, Math.round(brightness)));
+    this.emit();
+    return { ok: true };
+  }
+
+  setPowerState(stableId: string, powerState: 'on' | 'standby' | 'off'): SwitchOutcome {
+    const monitor = this.monitors.get(stableId);
+    if (!monitor) {
+      return {
+        ok: false,
+        error: { code: 'UNKNOWN_TARGET', message: 'No such monitor', retryable: false },
+      };
+    }
+    if (!monitor.capabilities.includes('power')) {
+      return {
+        ok: false,
+        error: {
+          code: 'CAPABILITY_UNSUPPORTED',
+          message: `${monitor.detectedName} does not support power control`,
+          retryable: false,
+        },
+      };
+    }
+    monitor.currentPowerState = powerState;
+    this.emit();
+    return { ok: true };
   }
 
   private finish(commandId: string, outcome: SwitchOutcome): SwitchOutcome {

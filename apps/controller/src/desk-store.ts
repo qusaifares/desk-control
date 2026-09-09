@@ -192,6 +192,7 @@ export class DeskStore {
       protocolVersion,
       agentVersion: payload.agent.agentVersion,
       providerKind: payload.agent.providerKind,
+      supportedCommandKinds: payload.supportedCommandKinds,
       connectivity: { state: 'online', lastSeenAt: now, detail: null },
     };
     this.agents.set(agent.id, agent);
@@ -226,6 +227,11 @@ export class DeskStore {
 
   isAgentOnline(agentId: string): boolean {
     return this.agents.get(agentId)?.connectivity.state === 'online';
+  }
+
+  /** Whether an agent claimed it can carry out this kind of command. */
+  agentSupportsCommand(agentId: string, kind: string): boolean {
+    return this.agents.get(agentId)?.supportedCommandKinds.includes(kind) ?? false;
   }
 
   /* ---------------------------------------------------------------- *
@@ -395,6 +401,7 @@ export class DeskStore {
       activeInputId,
       activeSourceComputerId,
       powerState: best.report.powerState,
+      brightness: best.report.brightness,
       reachability: best.report.reachability,
       observedAt: best.observedAt,
       reportedByAgentId: best.agentId,

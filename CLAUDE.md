@@ -114,8 +114,22 @@ Also specific to this product:
 - Comments explain _why_, especially where a hardware reality forces an odd shape (see
   `selectControlPath`, `lastKnownActiveInputs`, `MockMonitorControlProvider.getObservedState`).
 
+## Adding a command kind
+
+Adding a member to `CommandPayload` would break older agents, whose parser rejects the whole frame.
+So the agent declares `supportedCommandKinds` in `agent.hello` (optional, defaulting to
+`['set-monitor-input']`), derived from what its provider actually implements, and the controller
+checks that list when selecting a control path. No protocol bump; unsupported work is refused
+immediately with `NO_CONTROL_PATH` rather than dispatched and timed out.
+
+Give a new kind its own `commandTargetKey` unless it genuinely shares a target - brightness must not
+supersede an in-flight input switch on the same monitor.
+
 ## Things that are easy to get wrong here
 
+- **Power states differ per panel.** VCP 0xD6 values are not universal: one monitor on this desk
+  offers standby, the one beside it does not. Take a named state and resolve it against the values
+  that monitor advertises; refuse when there is no match.
 - **DDC only answers on the live input.** After a switch, the agent that _gave up_ the input loses
   access and the one that _gained_ it has not polled yet. `DeskStore.lastKnownActiveInputs` is a
   routing hint for this window only — never surface it as current truth. `lastKnownSourceComputerId`

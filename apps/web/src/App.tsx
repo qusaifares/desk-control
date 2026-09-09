@@ -107,7 +107,12 @@ export function App() {
                 void run(() => deskApi.setPeripheralOwner(peripheralId, computerId))
               }
             />
-            <QuickActions snapshot={snapshot} />
+            <QuickActions
+              snapshot={snapshot}
+              onSetAllDisplaysPower={(powerState) =>
+                void run(() => deskApi.setAllDisplaysPower(powerState))
+              }
+            />
           </>
         }
         footer={<StatusFooter snapshot={snapshot} connection={connection} />}
@@ -118,6 +123,12 @@ export function App() {
           snapshot={snapshot}
           monitor={selectedMonitor}
           onPick={pickSource}
+          onSetBrightness={(brightness) =>
+            void run(() => deskApi.setBrightness(selectedMonitor.id, brightness))
+          }
+          onSetPower={(powerState) =>
+            void run(() => deskApi.setMonitorPower(selectedMonitor.id, powerState))
+          }
           onClose={() => setSelectedMonitorId(null)}
         />
       ) : null}

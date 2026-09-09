@@ -53,6 +53,12 @@ export const AgentSchema = NameableSchema.extend({
   connectivity: ConnectivitySchema,
   /** Provider implementation backing this agent, e.g. "mock", "windows-ddc". */
   providerKind: z.string(),
+  /**
+   * Command kinds this agent claims it can carry out. The controller checks
+   * this before dispatching, so an agent built before a command kind existed is
+   * never sent work it would reject.
+   */
+  supportedCommandKinds: z.array(z.string()).default(['set-monitor-input']),
 });
 export type Agent = z.infer<typeof AgentSchema>;
 

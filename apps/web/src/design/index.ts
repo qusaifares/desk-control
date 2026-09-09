@@ -8,5 +8,6 @@ export * from './primitives/Chip.js';
 export * from './primitives/StatusDot.js';
 export * from './primitives/Button.js';
 export * from './primitives/Sheet.js';
+export * from './primitives/Slider.js';
 export * from './primitives/TextField.js';
 export * from './primitives/Feedback.js';

@@ -5,6 +5,8 @@ import {
   DeclareComputerRequestSchema,
   RenameRequestSchema,
   SetMonitorSourceRequestSchema,
+  SetMonitorBrightnessRequestSchema,
+  SetMonitorPowerRequestSchema,
   SetPeripheralOwnerRequestSchema,
   SetPlacementRequestSchema,
   SetWiringRequestSchema,
@@ -91,6 +93,50 @@ export async function createServer(options: {
       sourceComputerId: parsed.data.sourceComputerId,
       origin: 'user',
       ...(parsed.data.commandId ? { commandId: parsed.data.commandId } : {}),
+    });
+    if (result.status === 'rejected') {
+      return reply.status(409).send({ error: { code: result.code, message: result.message } });
+    }
+    return { accepted: true, commandIds: [result.commandId], skipped: [] };
+  });
+
+  app.post('/api/desk/monitor-brightness', async (request, reply) => {
+    const parsed = SetMonitorBrightnessRequestSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply
+        .status(400)
+        .send({ error: { code: 'INVALID_REQUEST', message: parsed.error.message } });
+    }
+    const result = commands.setMonitorBrightness({
+      monitorId: parsed.data.monitorId,
+      brightness: parsed.data.brightness,
+      origin: 'user',
+      ...(parsed.data.commandId ? { commandId: parsed.data.commandId } : {}),
+    });
+    if (result.status === 'rejected') {
+      return reply.status(409).send({ error: { code: result.code, message: result.message } });
+    }
+    return { accepted: true, commandIds: [result.commandId], skipped: [] };
+  });
+
+  app.post('/api/desk/monitor-power', async (request, reply) => {
+    const parsed = SetMonitorPowerRequestSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply
+        .status(400)
+        .send({ error: { code: 'INVALID_REQUEST', message: parsed.error.message } });
+    }
+
+    // No monitorId means the whole desk, which is what the quick actions use.
+    if (!parsed.data.monitorId) {
+      const all = commands.setAllMonitorsPower(parsed.data.powerState);
+      return { accepted: true, commandIds: all.commandIds, skipped: all.skipped };
+    }
+
+    const result = commands.setMonitorPower({
+      monitorId: parsed.data.monitorId,
+      powerState: parsed.data.powerState,
+      origin: 'user',
     });
     if (result.status === 'rejected') {
       return reply.status(409).send({ error: { code: result.code, message: result.message } });

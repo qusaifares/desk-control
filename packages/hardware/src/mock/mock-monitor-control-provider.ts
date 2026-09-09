@@ -3,7 +3,9 @@ import type { MonitorReport, ObservedMonitorReport } from '@desk-control/protoco
 import type {
   MonitorControlProvider,
   ProviderOperationResult,
+  SetBrightnessRequest,
   SetInputRequest,
+  SetPowerRequest,
 } from '../monitor-control-provider.js';
 import type { SimulatedDesk } from './simulated-desk.js';
 
@@ -66,6 +68,7 @@ export class MockMonitorControlProvider implements MonitorControlProvider {
           stableId: monitor.stableId,
           activeInputId: null,
           powerState: 'unknown',
+          brightness: null,
           reachability: 'unreachable',
           error: {
             code: 'DEVICE_UNREACHABLE',
@@ -79,11 +82,34 @@ export class MockMonitorControlProvider implements MonitorControlProvider {
       return {
         stableId: monitor.stableId,
         activeInputId: monitor.activeInputId,
-        powerState: 'on',
+        powerState: monitor.currentPowerState,
+        brightness: monitor.capabilities.includes('brightness') ? monitor.currentBrightness : null,
         reachability: 'reachable',
         error: null,
       } satisfies ObservedMonitorReport;
     });
+  }
+
+  async setBrightness(request: SetBrightnessRequest): Promise<ProviderOperationResult> {
+    if (!this.desk.canControl(request.stableId, this.computerId)) {
+      return {
+        ok: false,
+        error: { code: 'DEVICE_UNREACHABLE', message: 'No DDC access right now', retryable: true },
+      };
+    }
+    const outcome = this.desk.setBrightness(request.stableId, request.brightness);
+    return outcome.error ? { ok: false, error: outcome.error } : { ok: true };
+  }
+
+  async setPower(request: SetPowerRequest): Promise<ProviderOperationResult> {
+    if (!this.desk.canControl(request.stableId, this.computerId)) {
+      return {
+        ok: false,
+        error: { code: 'DEVICE_UNREACHABLE', message: 'No DDC access right now', retryable: true },
+      };
+    }
+    const outcome = this.desk.setPowerState(request.stableId, request.powerState);
+    return outcome.error ? { ok: false, error: outcome.error } : { ok: true };
   }
 
   async setInput(request: SetInputRequest): Promise<ProviderOperationResult> {

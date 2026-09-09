@@ -46,6 +46,15 @@ export const AgentHelloPayloadSchema = z.object({
   }),
   monitors: z.array(MonitorReportSchema).default([]),
   /**
+   * Command kinds this agent can carry out.
+   *
+   * Optional, and defaulted to the original set, so an agent built before a
+   * command kind existed is described accurately rather than being sent work it
+   * would reject. This is why adding a command kind needs no protocol bump: the
+   * controller simply does not dispatch it to agents that never claimed it.
+   */
+  supportedCommandKinds: z.array(z.string()).default(['set-monitor-input']),
+  /**
    * Optional shared secret. Absent today for a fresh LAN install; the field
    * exists now so authentication can be turned on without a version bump.
    */

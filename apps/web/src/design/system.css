@@ -479,6 +479,76 @@ button.ds-tile:active:not(:disabled) {
   color: var(--text-tertiary);
 }
 
+/* ---------- slider ---------- */
+
+.ds-slider {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.ds-slider-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.ds-slider-value {
+  font-size: var(--text-base);
+  font-weight: var(--weight-bold);
+  font-variant-numeric: tabular-nums;
+}
+
+.ds-slider-input {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: var(--control-min-height);
+  background: none;
+  cursor: pointer;
+}
+
+.ds-slider-input::-webkit-slider-runnable-track {
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-3);
+  border: 1px solid var(--border-subtle);
+}
+
+.ds-slider-input::-moz-range-track {
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-3);
+  border: 1px solid var(--border-subtle);
+}
+
+/* Generous thumb: this has to be usable with a fingertip. */
+.ds-slider-input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 26px;
+  height: 26px;
+  margin-top: -10px;
+  border-radius: 50%;
+  background: var(--tone-accent);
+  border: 2px solid var(--surface-page);
+  box-shadow: var(--shadow-1);
+}
+
+.ds-slider-input::-moz-range-thumb {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--tone-accent);
+  border: 2px solid var(--surface-page);
+}
+
+.ds-slider-input:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 /* ---------- feedback ---------- */
 
 .ds-notice {

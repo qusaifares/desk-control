@@ -62,6 +62,8 @@ export const ObservedMonitorStateSchema = z.object({
   /** Derived by the controller from activeInputId + wiring. */
   activeSourceComputerId: IdSchema.nullable().default(null),
   powerState: PowerStateSchema.default('unknown'),
+  /** Percentage read back from the panel, when it reports one. */
+  brightness: z.number().int().min(0).max(100).nullable().default(null),
   reachability: ReachabilitySchema.default('unknown'),
   observedAt: z.string().datetime(),
   /** Which agent reported this. Useful when several can see the monitor. */

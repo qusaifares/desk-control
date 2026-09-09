@@ -164,11 +164,47 @@ export function parseCapabilities(raw: string): ParsedCapabilities {
  * ------------------------------------------------------------------ */
 
 export const VCP_INPUT_SOURCE = 0x60;
-const VCP_BRIGHTNESS = 0x10;
+export const VCP_BRIGHTNESS = 0x10;
+export const VCP_POWER_MODE = 0xd6;
 const VCP_CONTRAST = 0x12;
 const VCP_AUDIO_VOLUME = 0x62;
-const VCP_POWER_MODE = 0xd6;
 const VCP_OSD_BUTTON_CONTROL = 0xca;
+
+/**
+ * MCCS power states for VCP 0xD6. Panels advertise different subsets - one of
+ * the two on this desk offers 01/04/05 and the other only 01/05 - so a named
+ * state is resolved against what the monitor actually reports rather than
+ * against a fixed constant.
+ */
+const POWER_PREFERENCES: Record<'on' | 'standby' | 'off', number[]> = {
+  on: [0x01],
+  // Standby, then suspend, then off-by-sleep: nearest thing the panel has.
+  standby: [0x02, 0x03, 0x04],
+  // Powered off, falling back to off-by-sleep.
+  off: [0x05, 0x04],
+};
+
+export function resolvePowerValue(
+  vcp: Map<number, number[]>,
+  state: 'on' | 'standby' | 'off',
+): number | null {
+  const supported = vcp.get(VCP_POWER_MODE) ?? [];
+  for (const candidate of POWER_PREFERENCES[state]) {
+    if (supported.includes(candidate)) return candidate;
+  }
+  // A panel that lists no values but supports the code at all: 0x01 for on is
+  // universal, anything else we refuse rather than guess.
+  if (supported.length === 0 && vcp.has(VCP_POWER_MODE) && state === 'on') return 0x01;
+  return null;
+}
+
+/** Maps a raw VCP 0xD6 reading back onto a named state. */
+export function describePowerValue(value: number): 'on' | 'standby' | 'off' | 'unknown' {
+  if (value === 0x01) return 'on';
+  if (value === 0x02 || value === 0x03) return 'standby';
+  if (value === 0x04 || value === 0x05) return 'off';
+  return 'unknown';
+}
 
 /**
  * Maps reported VCP codes onto domain capabilities.

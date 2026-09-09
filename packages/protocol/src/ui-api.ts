@@ -25,6 +25,20 @@ export const SetPeripheralOwnerRequestSchema = z.object({
 });
 export type SetPeripheralOwnerRequest = z.infer<typeof SetPeripheralOwnerRequestSchema>;
 
+export const SetMonitorBrightnessRequestSchema = z.object({
+  monitorId: z.string().min(1),
+  brightness: z.number().int().min(0).max(100),
+  commandId: z.string().min(1).optional(),
+});
+export type SetMonitorBrightnessRequest = z.infer<typeof SetMonitorBrightnessRequestSchema>;
+
+export const SetMonitorPowerRequestSchema = z.object({
+  /** Omit to apply to every monitor that supports power control. */
+  monitorId: z.string().min(1).optional(),
+  powerState: z.enum(['on', 'standby', 'off']),
+});
+export type SetMonitorPowerRequest = z.infer<typeof SetMonitorPowerRequestSchema>;
+
 export const ApplyPresetRequestSchema = z.object({
   presetId: z.string().min(1),
 });

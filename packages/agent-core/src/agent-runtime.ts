@@ -158,6 +158,20 @@ export class AgentRuntime {
     await this.sendHello();
   }
 
+  /**
+   * What this agent can actually carry out.
+   *
+   * Derived from the provider rather than hardcoded, so a provider that has not
+   * implemented brightness simply never gets asked for it - the controller
+   * checks this list before dispatching.
+   */
+  private supportedCommandKinds(): string[] {
+    const kinds = ['set-monitor-input'];
+    if (this.options.provider.setBrightness) kinds.push('set-monitor-brightness');
+    if (this.options.provider.setPower) kinds.push('set-monitor-power');
+    return kinds;
+  }
+
   private async sendHello(): Promise<void> {
     this.monitors = await this.options.provider.discoverMonitors();
     this.send(
@@ -176,6 +190,7 @@ export class AgentRuntime {
           metadata: this.options.metadata ?? {},
         },
         monitors: this.monitors,
+        supportedCommandKinds: this.supportedCommandKinds(),
         authToken: this.options.authToken ?? null,
       }),
     );
@@ -296,53 +311,7 @@ export class AgentRuntime {
       return;
     }
 
-    if (payload.payload.kind !== 'set-monitor-input') {
-      this.send(
-        buildMessage('agent.command-result', {
-          commandId: payload.commandId,
-          ok: false,
-          error: {
-            code: 'UNKNOWN_COMMAND_KIND' as const,
-            message: `Agent cannot execute ${payload.payload.kind}`,
-            retryable: false,
-            relatedMessageId: null,
-          },
-          observed: [],
-        }),
-      );
-      return;
-    }
-
-    const { monitorId, inputId } = payload.payload;
-    const monitor = this.monitors.find((candidate) => candidate.stableId === monitorId);
-    const input = monitor?.inputs.find((candidate) => candidate.id === inputId);
-
-    if (!monitor || !input) {
-      this.send(
-        buildMessage('agent.command-result', {
-          commandId: payload.commandId,
-          ok: false,
-          error: {
-            code: 'UNKNOWN_TARGET' as const,
-            message: `Agent does not see monitor ${monitorId} input ${inputId}`,
-            retryable: false,
-            relatedMessageId: null,
-          },
-          observed: await this.pushObservedState(),
-        }),
-      );
-      return;
-    }
-
-    const timeoutMs = Math.max(1000, Date.parse(payload.deadlineAt) - Date.now());
-    const result = await this.options.provider.setInput({
-      stableId: monitor.stableId,
-      localHandle: monitor.localHandle,
-      inputId: input.id,
-      ddcInputSourceValue: input.ddcInputSourceValue,
-      commandId: payload.commandId,
-      timeoutMs,
-    });
+    const result = await this.execute(payload);
 
     if (result.ok) this.handledCommands.set(payload.commandId, true);
 
@@ -365,5 +334,97 @@ export class AgentRuntime {
         observed,
       }),
     );
+  }
+
+  /** Dispatches one command to the provider. Unknown kinds fail, never silently pass. */
+  private async execute(
+    payload: Extract<ControllerToAgentMessage, { type: 'controller.command' }>['payload'],
+  ): Promise<{ ok: boolean; error?: { code: string; message: string; retryable: boolean } }> {
+    const command = payload.payload;
+    const timeoutMs = Math.max(1000, Date.parse(payload.deadlineAt) - Date.now());
+
+    if (command.kind === 'set-monitor-input') {
+      const monitor = this.monitors.find((candidate) => candidate.stableId === command.monitorId);
+      const input = monitor?.inputs.find((candidate) => candidate.id === command.inputId);
+      if (!monitor || !input) {
+        return {
+          ok: false,
+          error: {
+            code: 'UNKNOWN_TARGET',
+            message: `Agent does not see monitor ${command.monitorId} input ${command.inputId}`,
+            retryable: false,
+          },
+        };
+      }
+      return this.options.provider.setInput({
+        stableId: monitor.stableId,
+        localHandle: monitor.localHandle,
+        inputId: input.id,
+        ddcInputSourceValue: input.ddcInputSourceValue,
+        commandId: payload.commandId,
+        timeoutMs,
+      });
+    }
+
+    if (command.kind === 'set-monitor-brightness' || command.kind === 'set-monitor-power') {
+      const monitor = this.monitors.find((candidate) => candidate.stableId === command.monitorId);
+      if (!monitor) {
+        return {
+          ok: false,
+          error: {
+            code: 'UNKNOWN_TARGET',
+            message: `Agent does not see monitor ${command.monitorId}`,
+            retryable: false,
+          },
+        };
+      }
+
+      if (command.kind === 'set-monitor-brightness') {
+        if (!this.options.provider.setBrightness) {
+          return {
+            ok: false,
+            error: {
+              code: 'UNKNOWN_COMMAND_KIND',
+              message: 'This provider cannot set brightness',
+              retryable: false,
+            },
+          };
+        }
+        return this.options.provider.setBrightness({
+          stableId: monitor.stableId,
+          localHandle: monitor.localHandle,
+          brightness: command.brightness,
+          commandId: payload.commandId,
+          timeoutMs,
+        });
+      }
+
+      if (!this.options.provider.setPower) {
+        return {
+          ok: false,
+          error: {
+            code: 'UNKNOWN_COMMAND_KIND',
+            message: 'This provider cannot set power state',
+            retryable: false,
+          },
+        };
+      }
+      return this.options.provider.setPower({
+        stableId: monitor.stableId,
+        localHandle: monitor.localHandle,
+        powerState: command.powerState,
+        commandId: payload.commandId,
+        timeoutMs,
+      });
+    }
+
+    return {
+      ok: false,
+      error: {
+        code: 'UNKNOWN_COMMAND_KIND',
+        message: `Agent cannot execute ${command.kind}`,
+        retryable: false,
+      },
+    };
   }
 }

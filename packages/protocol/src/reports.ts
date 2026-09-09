@@ -56,6 +56,8 @@ export const ObservedMonitorReportSchema = z.object({
   stableId: z.string().min(1),
   activeInputId: z.string().nullable().default(null),
   powerState: PowerStateSchema.default('unknown'),
+  /** Optional: added after v1, absent from older agents rather than wrong. */
+  brightness: z.number().int().min(0).max(100).nullable().default(null),
   reachability: ReachabilitySchema.default('unknown'),
   error: z.object({ code: z.string(), message: z.string() }).nullable().default(null),
 });

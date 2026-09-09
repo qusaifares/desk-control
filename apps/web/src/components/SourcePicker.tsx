@@ -1,13 +1,15 @@
 import type { DeskSnapshot, Monitor } from '@desk-control/domain';
-import { Chip, ListRow, Sheet, StatusDot, Stack } from '../design/index.js';
+import { Chip, ListRow, Sheet, Slider, StatusDot, Stack } from '../design/index.js';
 import { CONNECTOR_COLORS } from '../lib/appearance.js';
 import { agentForComputer, computerById, displayNameOf, sourcesForMonitor } from '../lib/desk.js';
-import { platformIcon } from './icons.js';
+import { MoonIcon, platformIcon } from './icons.js';
 
 interface Props {
   snapshot: DeskSnapshot;
   monitor: Monitor;
   onPick: (computerId: string) => void;
+  onSetBrightness: (brightness: number) => void;
+  onSetPower: (powerState: 'on' | 'standby' | 'off') => void;
   onClose: () => void;
 }
 
@@ -15,11 +17,20 @@ interface Props {
  * Only computers physically wired to this monitor are offered — the list comes
  * from discovered wiring, not from a hardcoded desk.
  */
-export function SourcePicker({ snapshot, monitor, onPick, onClose }: Props) {
+export function SourcePicker({
+  snapshot,
+  monitor,
+  onPick,
+  onSetBrightness,
+  onSetPower,
+  onClose,
+}: Props) {
   const sources = sourcesForMonitor(snapshot, monitor);
   const resolution = snapshot.resolutions.monitors[monitor.id];
   const observedId = resolution?.observedSourceComputerId ?? null;
   const desiredId = resolution?.desiredSourceComputerId ?? null;
+  // Read from the panel, not from whatever was last requested.
+  const observedBrightness = snapshot.observed.monitors[monitor.id]?.brightness ?? null;
 
   const subtitle = [
     `${monitor.identity.manufacturerId} ${monitor.identity.model}`,
@@ -52,6 +63,25 @@ export function SourcePicker({ snapshot, monitor, onPick, onClose }: Props) {
       }
     >
       <Stack>
+        {monitor.capabilities.includes('brightness') ? (
+          <Slider
+            label="Brightness"
+            unit="%"
+            value={observedBrightness}
+            emptyLabel="not read yet"
+            onCommit={onSetBrightness}
+          />
+        ) : null}
+
+        {monitor.capabilities.includes('power') ? (
+          <ListRow
+            icon={<MoonIcon />}
+            title="Turn this display off"
+            subtitle="It stays off until something wakes it"
+            onClick={() => onSetPower('off')}
+          />
+        ) : null}
+
         {sources.length === 0 ? (
           <ListRow title="Nothing is wired to this monitor yet" hideChevron />
         ) : null}

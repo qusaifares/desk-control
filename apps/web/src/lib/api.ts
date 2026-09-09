@@ -22,6 +22,12 @@ export const deskApi = {
   setPeripheralOwner: (peripheralId: string, ownerComputerId: string) =>
     post('/api/desk/peripheral-owner', { peripheralId, ownerComputerId }),
   applyPreset: (presetId: string) => post('/api/desk/preset', { presetId }),
+  setBrightness: (monitorId: string, brightness: number) =>
+    post('/api/desk/monitor-brightness', { monitorId, brightness }),
+  setMonitorPower: (monitorId: string, powerState: 'on' | 'standby' | 'off') =>
+    post('/api/desk/monitor-power', { monitorId, powerState }),
+  setAllDisplaysPower: (powerState: 'on' | 'standby' | 'off') =>
+    post('/api/desk/monitor-power', { powerState }),
   rename: (
     entityType: 'computer' | 'monitor' | 'peripheral' | 'preset',
     entityId: string,

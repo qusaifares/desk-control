@@ -28,6 +28,23 @@ export interface ProviderOperationResult {
   error?: { code: string; message: string; retryable: boolean };
 }
 
+export interface SetBrightnessRequest {
+  stableId: string;
+  localHandle: string;
+  /** Percentage. Providers scale it to whatever range the panel reports. */
+  brightness: number;
+  commandId: string;
+  timeoutMs: number;
+}
+
+export interface SetPowerRequest {
+  stableId: string;
+  localHandle: string;
+  powerState: 'on' | 'standby' | 'off';
+  commandId: string;
+  timeoutMs: number;
+}
+
 export interface MonitorControlProvider {
   /** Short identifier for logs and the agent registration, e.g. "mock". */
   readonly kind: string;
@@ -45,6 +62,14 @@ export interface MonitorControlProvider {
   getObservedState(): Promise<ObservedMonitorReport[]>;
 
   setInput(request: SetInputRequest): Promise<ProviderOperationResult>;
+
+  /**
+   * Optional: a provider that cannot do these simply omits them, and the agent
+   * reports the corresponding command kinds as unsupported rather than
+   * accepting work it would silently drop.
+   */
+  setBrightness?(request: SetBrightnessRequest): Promise<ProviderOperationResult>;
+  setPower?(request: SetPowerRequest): Promise<ProviderOperationResult>;
 
   dispose?(): Promise<void>;
 }

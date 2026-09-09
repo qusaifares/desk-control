@@ -188,5 +188,5 @@ Verify the macOS provider on a real MacBook, then wire that Mac to a monitor the
 sees — the first time two agents share a panel and control-path merging stops being theory. Details
 at the end of [docs/hardware.md](docs/hardware.md).
 
-Until that hardware exists, the useful work is real peripheral-switch control (the USB switch is
-still simulated) and brightness/power command kinds, which would make the Quick Actions real.
+Until that hardware exists, the biggest remaining gap is real peripheral-switch control — keyboard
+and mouse routing is still entirely simulated.

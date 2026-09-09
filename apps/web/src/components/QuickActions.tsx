@@ -3,45 +3,48 @@ import { ListRow, Panel } from '../design/index.js';
 import { MoonIcon, PowerIcon, SunIcon } from './icons.js';
 
 /**
- * Power actions.
+ * Display power is real; computer power is not.
  *
- * These are shown but deliberately inert: display power, wake and sleep are not
- * in the protocol yet, so there is no command path behind them. They are
- * rendered disabled with the reason attached rather than hidden, because the
- * capabilities the desk *reports* are real - the gap is ours, and stating it is
- * more honest than a button that quietly does nothing.
+ * Waking or suspending a *computer* needs Wake-on-LAN and an OS-level sleep
+ * path that the agent protocol does not have, so that row stays disabled with
+ * the reason attached rather than hidden or wired to a no-op. The capabilities
+ * the desk reports are real - the missing piece is ours, and saying so is more
+ * honest than a button that quietly does nothing.
  */
-const NOT_IMPLEMENTED = 'Not implemented yet: power commands are not part of the agent protocol.';
-
-export function QuickActions({ snapshot }: { snapshot: DeskSnapshot }) {
-  const anyMonitorPower = snapshot.monitors.some((monitor) =>
+export function QuickActions({
+  snapshot,
+  onSetAllDisplaysPower,
+}: {
+  snapshot: DeskSnapshot;
+  onSetAllDisplaysPower: (powerState: 'on' | 'standby' | 'off') => void;
+}) {
+  const powerCapable = snapshot.monitors.filter((monitor) =>
     monitor.capabilities.includes('power'),
-  );
-  const anyWake = snapshot.computers.some((computer) =>
-    computer.capabilities.includes('wake-on-lan'),
   );
   const anySleep = snapshot.computers.some((computer) => computer.capabilities.includes('sleep'));
 
-  const reason = (supported: boolean) =>
-    supported ? NOT_IMPLEMENTED : 'No device on this desk reports this capability.';
+  const displaysHint =
+    powerCapable.length === 0
+      ? 'No display on this desk reports power control.'
+      : `${powerCapable.length} of ${snapshot.monitors.length} displays support this.`;
 
   return (
     <Panel title="Quick actions" plain>
       <ListRow
         icon={<MoonIcon />}
-        title="Display off"
-        subtitle="Standby every monitor"
-        disabled
-        onClick={() => {}}
-        hint={reason(anyMonitorPower)}
+        title="Displays off"
+        subtitle={`Power down ${powerCapable.length} display${powerCapable.length === 1 ? '' : 's'}`}
+        disabled={powerCapable.length === 0}
+        onClick={() => onSetAllDisplaysPower('off')}
+        hint={displaysHint}
       />
       <ListRow
         icon={<SunIcon />}
-        title="Wake all"
-        subtitle="Wake-on-LAN every computer"
-        disabled
-        onClick={() => {}}
-        hint={reason(anyWake)}
+        title="Displays on"
+        subtitle="Wake every display back up"
+        disabled={powerCapable.length === 0}
+        onClick={() => onSetAllDisplaysPower('on')}
+        hint={displaysHint}
       />
       <ListRow
         icon={<PowerIcon />}
@@ -49,7 +52,11 @@ export function QuickActions({ snapshot }: { snapshot: DeskSnapshot }) {
         subtitle="Suspend every computer"
         disabled
         onClick={() => {}}
-        hint={reason(anySleep)}
+        hint={
+          anySleep
+            ? 'Not implemented yet: suspending a computer is not part of the agent protocol.'
+            : 'No computer on this desk reports this capability.'
+        }
       />
     </Panel>
   );

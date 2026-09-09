@@ -74,6 +74,7 @@ export function anObservedMonitor(
     activeInputId: 'input-dp1',
     activeSourceComputerId: 'computer:test',
     powerState: 'on',
+    brightness: null,
     reachability: 'reachable',
     observedAt: now(),
     reportedByAgentId: 'agent:test',

@@ -84,6 +84,28 @@ Any frame other than `agent.hello` before registration is answered with `UNKNOWN
 socket closes. A reconnecting agent with an id that is already connected replaces its own old socket
 rather than doubling up.
 
+## Adding a command kind without a version bump
+
+`controller.command` carries a discriminated union of payloads. Adding a member to that union would
+break older agents — their parser would reject the whole frame — so the agent declares what it can
+do instead:
+
+```jsonc
+// agent.hello
+"supportedCommandKinds": ["set-monitor-input", "set-monitor-brightness", "set-monitor-power"]
+```
+
+The field is optional and defaults to `["set-monitor-input"]`, so an agent built before a kind
+existed is described accurately rather than optimistically. The controller checks the list when
+choosing a control path, and refuses with `NO_CONTROL_PATH` — immediately, with a clear reason —
+rather than dispatching work that would come back as a parse error or time out.
+
+The agent derives the list from its provider rather than hardcoding it, so a platform that has not
+implemented brightness is never asked for it.
+
+Current kinds: `set-monitor-input`, `set-monitor-brightness`, `set-monitor-power`,
+`set-peripheral-owner`.
+
 ## Command lifecycle
 
 ```

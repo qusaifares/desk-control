@@ -122,6 +122,7 @@ export function resolvePeripheralState(input: {
           activeInputId: null,
           activeSourceComputerId: input.observed.ownerComputerId,
           powerState: 'unknown',
+          brightness: null,
           reachability: input.observed.reachability,
           observedAt: input.observed.observedAt,
           reportedByAgentId: null,

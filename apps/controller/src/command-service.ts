@@ -9,6 +9,7 @@ import {
   selectControlPath,
   type CommandPayload,
   type DeskCommand,
+  type MonitorCapability,
   type StateOrigin,
 } from '@desk-control/domain';
 import type { PeripheralSwitchProvider } from '@desk-control/hardware';
@@ -32,6 +33,20 @@ interface IssueMonitorArgs {
   sourceComputerId: string;
   origin: StateOrigin;
   presetId?: string | null;
+  commandId?: string;
+}
+
+interface IssueBrightnessArgs {
+  monitorId: string;
+  brightness: number;
+  origin: StateOrigin;
+  commandId?: string;
+}
+
+interface IssuePowerArgs {
+  monitorId: string;
+  powerState: 'on' | 'standby' | 'off';
+  origin: StateOrigin;
   commandId?: string;
 }
 
@@ -130,6 +145,109 @@ export class CommandService {
   }
 
   /* ---------------------------------------------------------------- */
+
+  /**
+   * Brightness and display power.
+   *
+   * Same lifecycle as an input switch, and deliberately the same code path -
+   * capability gate, control-path selection, dispatch, verified result. The
+   * only extra check is that the chosen agent claimed it can do this kind of
+   * command at all, which is what lets new command kinds ship without a
+   * protocol bump.
+   */
+  setMonitorBrightness(args: IssueBrightnessArgs): IssueResult {
+    return this.issueMonitorFeature({
+      monitorId: args.monitorId,
+      capability: 'brightness',
+      capabilityMessage: 'cannot set brightness',
+      payload: {
+        kind: 'set-monitor-brightness',
+        monitorId: args.monitorId,
+        brightness: args.brightness,
+      },
+      origin: args.origin,
+      ...(args.commandId ? { commandId: args.commandId } : {}),
+    });
+  }
+
+  setMonitorPower(args: IssuePowerArgs): IssueResult {
+    return this.issueMonitorFeature({
+      monitorId: args.monitorId,
+      capability: 'power',
+      capabilityMessage: 'cannot be powered on or off',
+      payload: {
+        kind: 'set-monitor-power',
+        monitorId: args.monitorId,
+        powerState: args.powerState,
+      },
+      origin: args.origin,
+      ...(args.commandId ? { commandId: args.commandId } : {}),
+    });
+  }
+
+  /** Applies a power state to every monitor that supports it. */
+  setAllMonitorsPower(powerState: 'on' | 'standby' | 'off'): {
+    commandIds: string[];
+    skipped: Array<{ targetId: string; reason: string }>;
+  } {
+    const commandIds: string[] = [];
+    const skipped: Array<{ targetId: string; reason: string }> = [];
+
+    for (const monitor of this.store.monitors.values()) {
+      const result = this.setMonitorPower({ monitorId: monitor.id, powerState, origin: 'user' });
+      if (result.status === 'accepted') commandIds.push(result.commandId);
+      else skipped.push({ targetId: monitor.id, reason: result.code });
+    }
+    return { commandIds, skipped };
+  }
+
+  private issueMonitorFeature(args: {
+    monitorId: string;
+    capability: MonitorCapability;
+    capabilityMessage: string;
+    payload: CommandPayload;
+    origin: StateOrigin;
+    commandId?: string;
+  }): IssueResult {
+    const monitor = this.store.monitors.get(args.monitorId);
+    if (!monitor) {
+      return {
+        status: 'rejected',
+        code: 'UNKNOWN_TARGET',
+        message: `Unknown monitor ${args.monitorId}`,
+      };
+    }
+    if (!hasCapability(monitor.capabilities, args.capability)) {
+      return {
+        status: 'rejected',
+        code: 'CAPABILITY_UNSUPPORTED',
+        message: `${this.store.label(monitor.id)} ${args.capabilityMessage}`,
+      };
+    }
+
+    const command = this.createCommand(args.payload, args.origin, null, args.commandId);
+
+    const path = selectControlPath(monitor, {
+      activeInputId: this.store.bestKnownActiveInput(monitor.id),
+      isAgentOnline: (agentId) =>
+        this.dispatcher.isOnline(agentId) &&
+        this.store.agentSupportsCommand(agentId, args.payload.kind),
+    });
+
+    if (!path) {
+      this.failCommand(command.id, {
+        code: 'NO_CONTROL_PATH',
+        message:
+          'No online agent can carry out this command for that monitor right now. ' +
+          'The desk has not been changed.',
+        retryable: true,
+      });
+      return { status: 'accepted', commandId: command.id };
+    }
+
+    this.dispatch(command, path.agentId);
+    return { status: 'accepted', commandId: command.id };
+  }
 
   setPeripheralOwner(args: IssuePeripheralArgs): IssueResult {
     const peripheral = this.store.config.peripherals.find(

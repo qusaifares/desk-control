@@ -20,6 +20,7 @@ const observed = (overrides: Partial<ObservedMonitorState> = {}): ObservedMonito
   activeInputId: 'input-dp1',
   activeSourceComputerId: 'computer:a',
   powerState: 'on',
+  brightness: null,
   reachability: 'reachable',
   observedAt: '2026-01-01T00:00:01.000Z',
   reportedByAgentId: 'agent:a',

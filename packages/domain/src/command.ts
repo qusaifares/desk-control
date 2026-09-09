@@ -51,6 +51,27 @@ export const SetMonitorInputCommandSchema = z.object({
   sourceComputerId: IdSchema.nullable().default(null),
 });
 
+/** VCP 0x10. Value is a percentage; providers scale it to the panel's range. */
+export const SetMonitorBrightnessCommandSchema = z.object({
+  kind: z.literal('set-monitor-brightness'),
+  monitorId: IdSchema,
+  brightness: z.number().int().min(0).max(100),
+});
+
+/**
+ * VCP 0xD6. Deliberately three named states rather than raw VCP values: which
+ * numeric code means "off" varies by panel, so the provider picks one the
+ * monitor actually advertises.
+ */
+export const MonitorPowerStateSchema = z.enum(['on', 'standby', 'off']);
+export type MonitorPowerState = z.infer<typeof MonitorPowerStateSchema>;
+
+export const SetMonitorPowerCommandSchema = z.object({
+  kind: z.literal('set-monitor-power'),
+  monitorId: IdSchema,
+  powerState: MonitorPowerStateSchema,
+});
+
 export const SetPeripheralOwnerCommandSchema = z.object({
   kind: z.literal('set-peripheral-owner'),
   switchId: IdSchema,
@@ -62,6 +83,8 @@ export const SetPeripheralOwnerCommandSchema = z.object({
 
 export const CommandPayloadSchema = z.discriminatedUnion('kind', [
   SetMonitorInputCommandSchema,
+  SetMonitorBrightnessCommandSchema,
+  SetMonitorPowerCommandSchema,
   SetPeripheralOwnerCommandSchema,
 ]);
 export type CommandPayload = z.infer<typeof CommandPayloadSchema>;
@@ -90,12 +113,29 @@ export const DeskCommandSchema = z.object({
 });
 export type DeskCommand = z.infer<typeof DeskCommandSchema>;
 
-/** The target a command acts on, used to supersede stale commands. */
+/**
+ * The target a command acts on, used to supersede stale commands.
+ *
+ * Brightness, power and input are separate targets on the same monitor on
+ * purpose: dimming a panel must not cancel an input switch that is still in
+ * flight, and vice versa.
+ */
 export function commandTargetKey(payload: CommandPayload): string {
   switch (payload.kind) {
     case 'set-monitor-input':
-      return `monitor:${payload.monitorId}`;
+      return `monitor:${payload.monitorId}:input`;
+    case 'set-monitor-brightness':
+      return `monitor:${payload.monitorId}:brightness`;
+    case 'set-monitor-power':
+      return `monitor:${payload.monitorId}:power`;
     case 'set-peripheral-owner':
       return `switch:${payload.switchId}:${payload.channelId}`;
   }
 }
+
+/** Command kinds an agent carries out against a monitor. */
+export const MONITOR_COMMAND_KINDS = [
+  'set-monitor-input',
+  'set-monitor-brightness',
+  'set-monitor-power',
+] as const satisfies readonly CommandKind[];
