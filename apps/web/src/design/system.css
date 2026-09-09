@@ -435,6 +435,50 @@ button.ds-tile:active:not(:disabled) {
   gap: var(--space-2);
 }
 
+/* ---------- text field ---------- */
+
+.ds-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.ds-field-label {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.ds-field-row {
+  display: flex;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.ds-field-input {
+  flex: 1;
+  min-width: 160px;
+  min-height: var(--control-min-height);
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-inset);
+  color: var(--text-primary);
+  font: inherit;
+}
+
+.ds-field-input:focus {
+  outline: none;
+  border-color: var(--tone-accent-border);
+}
+
+.ds-field-hint {
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
+}
+
 /* ---------- feedback ---------- */
 
 .ds-notice {

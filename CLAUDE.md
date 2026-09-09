@@ -126,7 +126,11 @@ Also specific to this product:
   peripheral on that channel and collapses onto one command.
 - **Wiring is discovered** from `connectedViaInputId`. `wiringOverrides` in config is only for inputs
   no agent can report.
-- Hardware facts are **never persisted**. Config holds user intent and labels only.
+- Hardware facts are **never persisted**. Config holds user intent and labels only, and it is
+  written as it changes (debounced), not on shutdown - a Pi loses power without warning.
+- A computer does not need an agent to be routable. `manualComputers` plus `wiringOverrides` let the
+  user declare a console or an un-instrumented laptop, and the switch is carried out by whichever
+  agent holds DDC access to that monitor.
 - Desired state is saved on shutdown but **never re-applied on boot**.
 
 ## Current state

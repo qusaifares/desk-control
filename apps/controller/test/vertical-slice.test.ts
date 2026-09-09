@@ -225,6 +225,37 @@ describe('presets', () => {
   });
 });
 
+describe('routing to a machine that has no agent', () => {
+  it('switches a monitor to a user-declared source and shows it as live', async () => {
+    const RIGHT = EXAMPLE_MONITOR_IDS.rightPortrait;
+
+    // A console: it will never run an agent, but it is still a source.
+    const console_ = harness.store.declareComputer('PlayStation 5', 'unknown');
+    expect(harness.store.setWiringOverride(RIGHT, 'input-usbc', console_.id)).toBe(true);
+
+    const result = harness.commands.setMonitorSource({
+      monitorId: RIGHT,
+      sourceComputerId: console_.id,
+      origin: 'user',
+    });
+    expect(result.status).toBe('accepted');
+    if (result.status !== 'accepted') return;
+
+    await waitFor(
+      () =>
+        harness.snapshot().resolutions.monitors[RIGHT]?.observedSourceComputerId === console_.id,
+      { message: 'never showed the declared source as live' },
+    );
+
+    // The switch was carried out by an agent that holds DDC access - the
+    // console itself was never involved.
+    const command = harness.store.commands.get(result.commandId);
+    expect(command?.status).toBe('succeeded');
+    expect(command?.agentId).not.toBe(console_.id);
+    expect(harness.desk.get(RIGHT)?.activeInputId).toBe('input-usbc');
+  });
+});
+
 describe('fail passive', () => {
   it('keeps desk state when an agent goes offline, and marks it offline', async () => {
     const before = harness.snapshot();

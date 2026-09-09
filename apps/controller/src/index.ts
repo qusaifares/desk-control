@@ -98,6 +98,24 @@ async function main(): Promise<void> {
     }
   }
 
+  /*
+   * Persist user data as it changes, debounced.
+   *
+   * Config used to be written only on a clean shutdown, so a Pi losing power
+   * lost every rename and layout change made since boot. Hardware facts are
+   * still never persisted - they are re-discovered from agents on each boot.
+   */
+  let saveTimer: NodeJS.Timeout | null = null;
+  const unsubscribeConfig = store.subscribeConfig(() => {
+    if (saveTimer) return;
+    saveTimer = setTimeout(() => {
+      saveTimer = null;
+      void configStore.save(deskConfig).catch((error: unknown) => {
+        logger.error({ error: (error as Error).message }, 'Failed to persist desk config');
+      });
+    }, 400);
+  });
+
   const server = await createServer({
     store,
     config,
@@ -144,6 +162,8 @@ async function main(): Promise<void> {
 
   const shutdown = async (signal: string) => {
     logger.info({ signal }, 'Shutting down; desk hardware is left exactly as it is');
+    unsubscribeConfig();
+    if (saveTimer) clearTimeout(saveTimer);
     await advertiser.stop();
     await server.close();
     // Persist user data only. Hardware facts are re-discovered on next boot.

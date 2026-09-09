@@ -125,6 +125,20 @@ Two subtleties worth keeping:
 - `drifted` is not `failed`. Someone pressing the monitor's own input button is information, not an
   error.
 
+## Sources without an agent
+
+`MonitorInput.connectedComputerId` is a wiring fact, and discovery can only fill it in for inputs an
+agent actually occupies. Everything else - a console, a laptop nobody installed anything on, a
+machine that is simply switched off - is covered by two pieces of user config:
+
+- `manualComputers` declares the machine, giving it a stable id (`computer:manual:<slug>`) and a
+  platform. Its connectivity stays `unknown` rather than `offline`, because it was never expected to
+  check in.
+- `wiringOverrides` says which input it is plugged into, and always beats what discovery inferred.
+
+Such a machine is then a first-class routing target. The switch is performed by whichever agent
+holds DDC access to that monitor, so the declared machine never runs anything.
+
 ## Presets are data
 
 A `Preset` is `{ monitorSources, peripheralOwners }` — two maps of ids. It has no code path of its

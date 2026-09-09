@@ -1,5 +1,6 @@
 import {
   DeskLayoutSchema,
+  PlatformSchema,
   DesiredStateSchema,
   PeripheralSchema,
   PeripheralSwitchSchema,
@@ -45,6 +46,23 @@ export const DeskConfigSchema = z.object({
    * inputs no agent can see (a console, a laptop with no agent installed).
    */
   wiringOverrides: z.record(z.string(), z.record(z.string(), z.string())).default({}),
+  /**
+   * Computers the user declared by hand.
+   *
+   * A source does not need an agent to be useful: a games console, or a laptop
+   * you have not installed anything on, is still a thing you route to a
+   * monitor. The switch is carried out by whichever agent holds DDC access to
+   * that monitor, so the declared machine never has to run anything.
+   */
+  manualComputers: z
+    .array(
+      z.object({
+        id: z.string().min(1),
+        detectedName: z.string().min(1),
+        platform: PlatformSchema,
+      }),
+    )
+    .default([]),
   /**
    * Last desired state, persisted for *display* after a restart.
    *

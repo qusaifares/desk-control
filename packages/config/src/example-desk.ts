@@ -423,5 +423,6 @@ export function exampleDeskConfig(): DeskConfig {
       },
     ],
     wiringOverrides: {},
+    manualComputers: [],
   };
 }

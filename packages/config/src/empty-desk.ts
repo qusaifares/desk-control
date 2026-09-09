@@ -23,5 +23,6 @@ export function emptyDeskConfig(): DeskConfig {
     peripherals: [],
     peripheralSwitches: [],
     wiringOverrides: {},
+    manualComputers: [],
   };
 }

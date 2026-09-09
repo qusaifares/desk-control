@@ -107,6 +107,25 @@ On first run the controller writes `.data/desk-config.json` seeded from the exam
 hand; it is plain JSON and is validated on load. An invalid file is moved aside rather than deleted,
 and the controller falls back to defaults.
 
+## Editing the desk
+
+Everything the desk needs is editable from the UI - press **Edit desk**:
+
+- drag a display to arrange it (snaps to half a grid unit)
+- tap a display to rename it, or to say what is plugged into each of its inputs
+- add a machine that has no agent, and wire it to an input
+
+Edits are written to `desk-config.json` as you make them. The equivalent API calls, if you prefer
+curl:
+
+```bash
+curl -XPOST http://127.0.0.1:7420/api/desk/computers -H 'content-type: application/json' -d '{"detectedName":"PlayStation 5","platform":"unknown"}'
+```
+
+```bash
+curl -XPOST http://127.0.0.1:7420/api/desk/wiring -H 'content-type: application/json' -d '{"monitorId":"<id>","inputId":"input-0x11","computerId":"computer:manual:playstation-5"}'
+```
+
 ## UI work
 
 `apps/web` is built on a small design system in `apps/web/src/design`. Read

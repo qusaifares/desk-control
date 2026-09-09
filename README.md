@@ -169,8 +169,24 @@ pnpm --filter @desk-control/agent exec tsx src/index.ts --controller ws://127.0.
 On a Mac, the same command builds a small helper with `clang` (Xcode Command Line Tools) and probes
 over IOAVService.
 
+## Machines without an agent
+
+A source does not need to run anything to be useful. Discovery can only report inputs an agent
+actually sits on, so on a desk where one machine runs an agent every other input looks empty — and
+nothing can be routed to it.
+
+**Edit desk** fixes that: declare the machine, say which input it is plugged into, and it becomes a
+routable source. The switch is carried out by whichever agent holds DDC access to that monitor, so
+the declared machine is never involved. A games console works exactly as well as a laptop.
+
+Everything you set there — display names, desk arrangement, wiring — is written to
+`desk-config.json` as you make it, not on shutdown.
+
 ## Next milestone
 
 Verify the macOS provider on a real MacBook, then wire that Mac to a monitor the Windows PC also
-sees — that is the first time two agents share a panel and control-path merging stops being theory.
-Details at the end of [docs/hardware.md](docs/hardware.md).
+sees — the first time two agents share a panel and control-path merging stops being theory. Details
+at the end of [docs/hardware.md](docs/hardware.md).
+
+Until that hardware exists, the useful work is real peripheral-switch control (the USB switch is
+still simulated) and brightness/power command kinds, which would make the Quick Actions real.

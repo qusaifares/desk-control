@@ -1,6 +1,7 @@
 import type { DeskConfig } from '@desk-control/config';
 import {
   displayName,
+  slugify,
   unionCapabilities,
   type Agent,
   type Computer,
@@ -11,6 +12,7 @@ import {
   type MonitorInput,
   type ObservedMonitorState,
   type ObservedPeripheralState,
+  type Placement,
   type Platform,
 } from '@desk-control/domain';
 import type {
@@ -41,6 +43,12 @@ const MAX_RETAINED_COMMANDS = 100;
 export class DeskStore {
   private revisionCounter = 0;
   private readonly listeners = new Set<() => void>();
+  /**
+   * Separate from `listeners` on purpose: state changes fire several times a
+   * second as observations arrive, while config changes are rare and are the
+   * only thing that needs writing to disk.
+   */
+  private readonly configListeners = new Set<() => void>();
 
   readonly computers = new Map<string, Computer>();
   readonly agents = new Map<string, Agent>();
@@ -89,6 +97,24 @@ export class DeskStore {
     return () => this.listeners.delete(listener);
   }
 
+  /** Fires when persisted user data changes and should be written to disk. */
+  subscribeConfig(listener: () => void): () => void {
+    this.configListeners.add(listener);
+    return () => this.configListeners.delete(listener);
+  }
+
+  /**
+   * Marks user data dirty.
+   *
+   * Config used to be written only on a graceful shutdown, which meant a Pi
+   * losing power lost every rename and every layout change since boot. Now each
+   * edit signals immediately and the controller debounces the write.
+   */
+  private markConfigDirty(): void {
+    for (const listener of this.configListeners) listener();
+    this.touch();
+  }
+
   touch(): void {
     this.revisionCounter += 1;
     for (const listener of this.listeners) listener();
@@ -109,6 +135,18 @@ export class DeskStore {
       for (const computerId of Object.values(wiring)) ids.add(computerId);
     }
     for (const id of ids) this.ensureComputer(id);
+
+    // Machines the user declared by hand. They will never have an agent, so
+    // their connectivity stays "unknown" rather than being called offline.
+    for (const manual of this.config.manualComputers) {
+      const computer = this.ensureComputer(manual.id, {
+        detectedName: manual.detectedName,
+        platform: manual.platform,
+      });
+      computer.detectedName = manual.detectedName;
+      computer.platform = manual.platform;
+      computer.metadata = { ...computer.metadata, declaredByUser: 'true' };
+    }
   }
 
   private ensureComputer(id: string, defaults?: Partial<Computer>): Computer {
@@ -272,6 +310,7 @@ export class DeskStore {
       columns: Math.max(this.config.layout.grid.columns, nextX + width),
       rows: Math.max(this.config.layout.grid.rows, height),
     };
+    this.markConfigDirty();
   }
 
   /**
@@ -496,8 +535,71 @@ export class DeskStore {
         break;
       }
     }
-    this.touch();
+    this.markConfigDirty();
     return true;
+  }
+
+  /**
+   * Moves a monitor on the desk map.
+   *
+   * The layout is user data and is stored separately from hardware, so
+   * re-detecting a monitor never moves it and moving it never rewrites a
+   * hardware fact.
+   */
+  setPlacement(monitorId: string, placement: Placement): boolean {
+    const monitor = this.monitors.get(monitorId);
+    if (!monitor) return false;
+
+    const stored: Placement = { ...placement, autoPlaced: false };
+    this.config.layout.placements[monitorId] = stored;
+    monitor.placement = stored;
+
+    this.config.layout.grid = {
+      columns: Math.max(this.config.layout.grid.columns, Math.ceil(stored.x + stored.width)),
+      rows: Math.max(this.config.layout.grid.rows, Math.ceil(stored.y + stored.height)),
+    };
+    this.markConfigDirty();
+    return true;
+  }
+
+  /**
+   * Declares what is plugged into a monitor input.
+   *
+   * Discovery covers inputs an agent sits on; this covers the rest - a console,
+   * or a laptop with nothing installed. A user override always beats what
+   * discovery inferred.
+   */
+  setWiringOverride(monitorId: string, inputId: string, computerId: string | null): boolean {
+    const monitor = this.monitors.get(monitorId);
+    const input = monitor?.inputs.find((candidate) => candidate.id === inputId);
+    if (!monitor || !input) return false;
+    if (computerId !== null && !this.computers.has(computerId)) return false;
+
+    const overrides = this.config.wiringOverrides[monitorId] ?? {};
+    if (computerId === null) delete overrides[inputId];
+    else overrides[inputId] = computerId;
+
+    if (Object.keys(overrides).length === 0) delete this.config.wiringOverrides[monitorId];
+    else this.config.wiringOverrides[monitorId] = overrides;
+
+    input.connectedComputerId = computerId;
+    this.markConfigDirty();
+    return true;
+  }
+
+  /** Adds a source that will never report itself. Returns the new computer. */
+  declareComputer(detectedName: string, platform: Platform): Computer {
+    const id = `computer:manual:${slugify(detectedName)}`;
+    this.config.manualComputers = [
+      ...this.config.manualComputers.filter((candidate) => candidate.id !== id),
+      { id, detectedName, platform },
+    ];
+    const computer = this.ensureComputer(id, { detectedName, platform });
+    computer.detectedName = detectedName;
+    computer.platform = platform;
+    computer.metadata = { ...computer.metadata, declaredByUser: 'true' };
+    this.markConfigDirty();
+    return computer;
   }
 
   /** Convenience for logs. */

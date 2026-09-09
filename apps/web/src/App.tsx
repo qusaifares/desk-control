@@ -2,6 +2,7 @@ import type { DeskSnapshot, Monitor } from '@desk-control/domain';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { DeskMap } from './components/DeskMap.js';
 import { Header } from './components/Header.js';
+import { MonitorEditorSheet } from './components/MonitorEditorSheet.js';
 import { PeripheralPanel } from './components/PeripheralPanel.js';
 import { PresetRail } from './components/PresetRail.js';
 import { QuickActions } from './components/QuickActions.js';
@@ -16,6 +17,7 @@ export function App() {
   const [connection, setConnection] = useState<ConnectionState>('connecting');
   const [selectedMonitorId, setSelectedMonitorId] = useState<string | null>(null);
   const [systemOpen, setSystemOpen] = useState(false);
+  const [editing, setEditing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(
@@ -67,7 +69,17 @@ export function App() {
   return (
     <>
       <AppShell
-        header={<Header name={snapshot.controller.name} onOpenSystem={() => setSystemOpen(true)} />}
+        header={
+          <Header
+            name={snapshot.controller.name}
+            onOpenSystem={() => setSystemOpen(true)}
+            editing={editing}
+            onToggleEdit={() => {
+              setEditing((current) => !current);
+              setSelectedMonitorId(null);
+            }}
+          />
+        }
         left={
           <PresetRail
             snapshot={snapshot}
@@ -79,7 +91,11 @@ export function App() {
             {error ? <Notice>{error}</Notice> : null}
             <DeskMap
               snapshot={snapshot}
+              editing={editing}
               onSelectMonitor={(monitor) => setSelectedMonitorId(monitor.id)}
+              onMoveMonitor={(monitorId, placement) =>
+                void run(() => deskApi.setPlacement(monitorId, placement))
+              }
             />
           </>
         }
@@ -97,12 +113,32 @@ export function App() {
         footer={<StatusFooter snapshot={snapshot} connection={connection} />}
       />
 
-      {selectedMonitor ? (
+      {selectedMonitor && !editing ? (
         <SourcePicker
           snapshot={snapshot}
           monitor={selectedMonitor}
           onPick={pickSource}
           onClose={() => setSelectedMonitorId(null)}
+        />
+      ) : null}
+
+      {selectedMonitor && editing ? (
+        <MonitorEditorSheet
+          snapshot={snapshot}
+          monitor={selectedMonitor}
+          onClose={() => setSelectedMonitorId(null)}
+          onRename={(customName) =>
+            void run(() => deskApi.rename('monitor', selectedMonitor.id, customName))
+          }
+          onSetWiring={(inputId, computerId) =>
+            void run(() => deskApi.setWiring(selectedMonitor.id, inputId, computerId))
+          }
+          onDeclareComputer={(computerName, platform, inputId) =>
+            void run(async () => {
+              const created = await deskApi.declareComputer(computerName, platform);
+              await deskApi.setWiring(selectedMonitor.id, inputId, created.computerId);
+            })
+          }
         />
       ) : null}
 

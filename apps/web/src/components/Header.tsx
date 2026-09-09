@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { IconButton } from '../design/index.js';
+import { Button, IconButton } from '../design/index.js';
 import { GearIcon } from './icons.js';
 
 /** Local clock. Never from the controller: the panel must read right offline. */
@@ -12,7 +12,17 @@ function useNow(): Date {
   return now;
 }
 
-export function Header({ name, onOpenSystem }: { name: string; onOpenSystem: () => void }) {
+export function Header({
+  name,
+  onOpenSystem,
+  editing,
+  onToggleEdit,
+}: {
+  name: string;
+  onOpenSystem: () => void;
+  editing?: boolean;
+  onToggleEdit?: () => void;
+}) {
   const now = useNow();
   const date = now.toLocaleDateString(undefined, {
     weekday: 'short',
@@ -32,6 +42,11 @@ export function Header({ name, onOpenSystem }: { name: string; onOpenSystem: () 
           <div className="desk-clock-date">{date}</div>
           <div className="desk-clock-time">{time}</div>
         </div>
+        {onToggleEdit ? (
+          <Button variant={editing ? 'primary' : 'default'} onClick={onToggleEdit}>
+            {editing ? 'Done' : 'Edit desk'}
+          </Button>
+        ) : null}
         <IconButton label="System details" onClick={onOpenSystem}>
           <GearIcon />
         </IconButton>

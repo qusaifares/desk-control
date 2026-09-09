@@ -1,4 +1,5 @@
-import type { DeskSnapshot, Monitor } from '@desk-control/domain';
+import type { DeskSnapshot, Monitor, Placement } from '@desk-control/domain';
+import type React from 'react';
 import { Chip, StatusDot } from '../design/index.js';
 import {
   CONNECTOR_COLORS,
@@ -13,6 +14,10 @@ interface Props {
   snapshot: DeskSnapshot;
   monitor: Monitor;
   onSelect: (monitor: Monitor) => void;
+  /** Overrides the stored placement while a drag is in progress. */
+  placement?: Placement | null;
+  editing?: boolean;
+  onPointerDown?: (event: React.PointerEvent) => void;
 }
 
 /**
@@ -26,8 +31,15 @@ interface Props {
  * The coloured screen is an identity treatment for the source machine, not a
  * preview: this system never touches the video path.
  */
-export function MonitorTile({ snapshot, monitor, onSelect }: Props) {
-  const placement = monitor.placement;
+export function MonitorTile({
+  snapshot,
+  monitor,
+  onSelect,
+  placement: placementOverride,
+  editing,
+  onPointerDown,
+}: Props) {
+  const placement = placementOverride ?? monitor.placement;
   if (!placement) return null;
 
   const { columns, rows } = snapshot.layout.grid;
@@ -49,8 +61,9 @@ export function MonitorTile({ snapshot, monitor, onSelect }: Props) {
   return (
     <button
       type="button"
-      className="monitor"
+      className={`monitor${editing ? ' is-editing' : ''}`}
       data-status={status}
+      onPointerDown={onPointerDown}
       style={{
         left: `${(placement.x / columns) * 100}%`,
         top: `${(placement.y / rows) * 100}%`,

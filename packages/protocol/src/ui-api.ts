@@ -38,6 +38,33 @@ export const RenameRequestSchema = z.object({
 });
 export type RenameRequest = z.infer<typeof RenameRequestSchema>;
 
+export const SetPlacementRequestSchema = z.object({
+  monitorId: z.string().min(1),
+  placement: z.object({
+    x: z.number(),
+    y: z.number(),
+    width: z.number().positive(),
+    height: z.number().positive(),
+    orientation: z.enum(['landscape', 'portrait-left', 'portrait-right']),
+  }),
+});
+export type SetPlacementRequest = z.infer<typeof SetPlacementRequestSchema>;
+
+/** Declares what is plugged into a monitor input. null clears the override. */
+export const SetWiringRequestSchema = z.object({
+  monitorId: z.string().min(1),
+  inputId: z.string().min(1),
+  computerId: z.string().min(1).nullable(),
+});
+export type SetWiringRequest = z.infer<typeof SetWiringRequestSchema>;
+
+/** Adds a source that has no agent and never will - a console, say. */
+export const DeclareComputerRequestSchema = z.object({
+  detectedName: z.string().min(1).max(60),
+  platform: z.enum(['windows', 'macos', 'linux', 'unknown']),
+});
+export type DeclareComputerRequest = z.infer<typeof DeclareComputerRequestSchema>;
+
 export const CommandAcceptedResponseSchema = z.object({
   accepted: z.boolean(),
   commandIds: z.array(z.string()),

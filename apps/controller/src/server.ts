@@ -2,9 +2,12 @@ import fastifyStatic from '@fastify/static';
 import fastifyWebsocket from '@fastify/websocket';
 import {
   ApplyPresetRequestSchema,
+  DeclareComputerRequestSchema,
   RenameRequestSchema,
   SetMonitorSourceRequestSchema,
   SetPeripheralOwnerRequestSchema,
+  SetPlacementRequestSchema,
+  SetWiringRequestSchema,
 } from '@desk-control/protocol';
 import type { ControllerInfo } from '@desk-control/domain';
 import Fastify, { type FastifyBaseLogger, type FastifyInstance } from 'fastify';
@@ -148,6 +151,56 @@ export async function createServer(options: {
         .send({ error: { code: 'UNKNOWN_TARGET', message: 'Unknown entity' } });
     }
     return { accepted: true, commandIds: [], skipped: [] };
+  });
+
+  app.post('/api/desk/layout', async (request, reply) => {
+    const parsed = SetPlacementRequestSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply
+        .status(400)
+        .send({ error: { code: 'INVALID_REQUEST', message: parsed.error.message } });
+    }
+    const ok = store.setPlacement(parsed.data.monitorId, {
+      ...parsed.data.placement,
+      autoPlaced: false,
+    });
+    if (!ok) {
+      return reply
+        .status(404)
+        .send({ error: { code: 'UNKNOWN_TARGET', message: 'Unknown monitor' } });
+    }
+    return { accepted: true, commandIds: [], skipped: [] };
+  });
+
+  app.post('/api/desk/wiring', async (request, reply) => {
+    const parsed = SetWiringRequestSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply
+        .status(400)
+        .send({ error: { code: 'INVALID_REQUEST', message: parsed.error.message } });
+    }
+    const ok = store.setWiringOverride(
+      parsed.data.monitorId,
+      parsed.data.inputId,
+      parsed.data.computerId,
+    );
+    if (!ok) {
+      return reply
+        .status(404)
+        .send({ error: { code: 'UNKNOWN_TARGET', message: 'Unknown monitor, input or computer' } });
+    }
+    return { accepted: true, commandIds: [], skipped: [] };
+  });
+
+  app.post('/api/desk/computers', async (request, reply) => {
+    const parsed = DeclareComputerRequestSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply
+        .status(400)
+        .send({ error: { code: 'INVALID_REQUEST', message: parsed.error.message } });
+    }
+    const computer = store.declareComputer(parsed.data.detectedName, parsed.data.platform);
+    return { accepted: true, commandIds: [], skipped: [], computerId: computer.id };
   });
 
   app.get('/api/stream', { websocket: true }, (socket) => {

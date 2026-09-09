@@ -1,19 +1,19 @@
-import type { DeskSnapshot } from '@desk-control/domain';
+import type { DeskSnapshot, Platform } from '@desk-control/domain';
 
 export type ConnectionState = 'connecting' | 'connected' | 'disconnected';
 
-async function post(path: string, body: unknown): Promise<void> {
+async function post<TResult = void>(path: string, body: unknown): Promise<TResult> {
   const response = await fetch(path, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(body),
   });
+  const payload = (await response.json().catch(() => null)) as
+    ({ error?: { message?: string } } & TResult) | null;
   if (!response.ok) {
-    const payload = (await response.json().catch(() => null)) as {
-      error?: { message?: string };
-    } | null;
     throw new Error(payload?.error?.message ?? `Request failed: ${response.status}`);
   }
+  return payload as TResult;
 }
 
 export const deskApi = {
@@ -27,7 +27,21 @@ export const deskApi = {
     entityId: string,
     customName: string | null,
   ) => post('/api/desk/name', { entityType, entityId, customName }),
+  setPlacement: (monitorId: string, placement: PlacementInput) =>
+    post('/api/desk/layout', { monitorId, placement }),
+  setWiring: (monitorId: string, inputId: string, computerId: string | null) =>
+    post('/api/desk/wiring', { monitorId, inputId, computerId }),
+  declareComputer: (detectedName: string, platform: Platform) =>
+    post<{ computerId: string }>('/api/desk/computers', { detectedName, platform }),
 };
+
+export interface PlacementInput {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  orientation: 'landscape' | 'portrait-left' | 'portrait-right';
+}
 
 /**
  * Subscribes to controller state.

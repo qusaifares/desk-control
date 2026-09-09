@@ -84,6 +84,28 @@
   padding: 0;
   background: none;
   border: none;
+  touch-action: none;
+}
+
+.monitor.is-editing {
+  cursor: grab;
+}
+
+.monitor.is-editing:active {
+  cursor: grabbing;
+}
+
+.monitor.is-editing .monitor-frame {
+  border-style: dashed;
+  border-color: var(--tone-accent-border);
+}
+
+.desk-map.is-editing {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.045) 1px, transparent 1px);
+  background-size: calc(100% / 8) calc(100% / 8);
+  border-radius: var(--radius-md);
 }
 
 .monitor-frame {
