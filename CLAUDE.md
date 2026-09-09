@@ -1,0 +1,123 @@
+# CLAUDE.md
+
+Instructions for Claude Code sessions working in this repository.
+
+## What this is
+
+A local-first desk control system. A controller service holds the **desired** state of a desk, agents
+on each computer report the **observed** state of hardware they can physically reach, and a
+touchscreen/browser UI renders the gap. Monitor input switching happens over DDC/CI from the agents;
+peripherals move via a hardware USB switch.
+
+Read `docs/architecture.md` before making structural changes. Read `docs/hardware.md` before touching
+anything near providers.
+
+## Invariants — do not violate these
+
+1. **Control plane, never data plane.** No video and no HID data may pass through the controller, the
+   Pi, or the network. If a change would put this system between a GPU and a panel, or between a
+   mouse and a game, it is wrong regardless of how convenient it is.
+2. **Fail passive.** A crashed controller, dead agent, lost network or powered-off Pi must never
+   change monitor or peripheral state. Disconnect handling marks things offline and stops there. Never
+   add "revert on disconnect", cleanup-on-shutdown, or a heartbeat that releases hardware.
+3. **Never fake an observation.** Observed state comes only from an agent reading hardware back.
+   Never write observed state optimistically from a command you just sent, in the controller or in the
+   UI. If we cannot see the hardware, the honest answer is `unreachable` or `unknown`.
+4. **Desired and observed are separate.** Do not merge them into one "current" field. The interesting
+   states live in the gap.
+5. **No hardcoded hardware.** No monitor models, vendor names, computer names, display counts,
+   layouts, input names or presets in core logic. Everything is discovered or configured. The only
+   place concrete desk values may appear is `packages/config/src/example-desk.ts` (seed data) and
+   tests.
+6. **Capabilities gate everything.** Branch on `Monitor.capabilities` / `ComputerCapability`, never on
+   a model string or platform. A missing capability is a typed `CAPABILITY_UNSUPPORTED` error, not a
+   silent no-op.
+7. **Identity is EDID-derived and stable.** Never key a monitor off an OS display index. Custom names
+   never replace identity: `displayName = customName ?? detectedName`.
+8. **One command path.** Presets, UI clicks and any future hotkey or automation all go through
+   `CommandService.setMonitorSource()` / `setPeripheralOwner()`. Never add a second way to change
+   hardware.
+9. **Validate at every boundary.** Zod-parse anything arriving over a socket, an HTTP body, or from
+   disk. Never trust a frame because of where it came from.
+10. **Commands are idempotent.** `commandId` is an idempotency key end to end — controller, agent, and
+    provider. Re-delivering one must not act twice.
+11. **Local-first.** No cloud service, account, telemetry or internet dependency in the normal path.
+    LAN only. Never bind beyond localhost by default.
+12. **Presets are data.** No preset may acquire behaviour or a special-cased application path.
+
+## Commands
+
+```bash
+pnpm install
+pnpm dev          # controller (7420) + web (5173) + simulated desk (7430)
+pnpm test
+pnpm lint
+pnpm typecheck
+pnpm build
+```
+
+Scope with `pnpm --filter @desk-control/<name> <script>`.
+
+Simulator control (dev only):
+
+```bash
+curl -XPOST http://127.0.0.1:7430/agents/agent:m4-macbook/stop
+curl -XPOST http://127.0.0.1:7430/monitors/<stableId>/fault -H 'content-type: application/json' -d '{"mode":"fail"}'
+```
+
+## Layout
+
+```
+apps/controller     Fastify service. desk-store, command-service, agent-gateway, snapshot, server
+apps/web            React + Vite UI. Renders snapshots; holds no desk state of its own
+apps/agent          Cross-platform agent binary for real machines
+apps/mock-desk      Dev simulator: one shared SimulatedDesk + one AgentRuntime per fake computer
+packages/domain     Entities, identity, capabilities, desired/observed, reconciliation, presets
+packages/protocol   Versioned wire protocol + client API schemas
+packages/hardware   MonitorControlProvider, PeripheralSwitchProvider, mocks, platform stubs
+packages/discovery  ControllerDiscovery / ControllerAdvertiser (static, in-memory, mDNS-shaped)
+packages/config     Config schema, JSON store, example desk seed data
+packages/agent-core  Agent runtime: transport, registration, commands, reconnect
+packages/test-utils Fixture builders, waitFor
+```
+
+## Conventions
+
+- **Internal packages are source-only.** `packages/*` export `./src/index.ts`; there is no build step
+  for them. Apps bundle them (tsup / Vite). Do not add `dist` outputs to these packages.
+- **Relative imports carry `.js` extensions**, ESM style, even for `.ts` files.
+- **Zod schemas are the source of truth**; derive types with `z.infer`. Do not hand-write a duplicate
+  interface.
+- Prefer simple explicit code over clever abstraction. This codebase is small on purpose.
+- Comments explain _why_, especially where a hardware reality forces an odd shape (see
+  `selectControlPath`, `lastKnownActiveInputs`, `MockMonitorControlProvider.getObservedState`).
+
+## Things that are easy to get wrong here
+
+- **DDC only answers on the live input.** After a switch, the agent that _gave up_ the input loses
+  access and the one that _gained_ it has not polled yet. `DeskStore.lastKnownActiveInputs` is a
+  routing hint for this window only — never surface it as current truth. `lastKnownSourceComputerId`
+  in the snapshot is explicitly rendered as stale.
+- **One monitor, several control paths.** Merge agent reports by stable id; union their capabilities;
+  route commands via `selectControlPath()`.
+- **A single-channel USB switch moves every peripheral at once.** `setPeripheralOwner` updates every
+  peripheral on that channel and collapses onto one command.
+- **Wiring is discovered** from `connectedViaInputId`. `wiringOverrides` in config is only for inputs
+  no agent can report.
+- Hardware facts are **never persisted**. Config holds user intent and labels only.
+- Desired state is saved on shutdown but **never re-applied on boot**.
+
+## Current state
+
+Everything works end to end against simulated hardware. Real DDC/CI (Windows, macOS, Linux) and real
+USB switch control are **not implemented** — `createPlatformProvider()` throws by design. mDNS is
+interface-only; static discovery is in use. Authentication is an optional shared token; the pairing
+design is in `docs/protocol.md`.
+
+Next milestone: real Windows DDC/CI discovery and input switching. Scope is at the end of
+`docs/hardware.md`.
+
+## Out of scope for now
+
+Cloud, accounts, remote access, audio switching, power management, Pi GPIO, production installers,
+polished animations.

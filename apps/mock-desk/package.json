@@ -1,0 +1,31 @@
+{
+  "name": "@desk-control/mock-desk",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js",
+    "build": "tsup",
+    "test": "vitest run --passWithNoTests",
+    "lint": "eslint src",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist .turbo node_modules"
+  },
+  "dependencies": {
+    "@desk-control/agent-core": "workspace:*",
+    "@desk-control/config": "workspace:*",
+    "@desk-control/discovery": "workspace:*",
+    "@desk-control/domain": "workspace:*",
+    "@desk-control/hardware": "workspace:*",
+    "@desk-control/protocol": "workspace:*",
+    "fastify": "^5.1.0",
+    "pino": "^9.5.0",
+    "pino-pretty": "^13.0.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "tsup": "^8.3.5"
+  }
+}

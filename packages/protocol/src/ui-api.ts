@@ -1,0 +1,59 @@
+import { DeskSnapshotSchema } from '@desk-control/domain';
+import { z } from 'zod';
+
+/**
+ * The client-facing API. Kept in the protocol package (not inside the web app)
+ * because more than one client will speak it: the Pi touchscreen, a browser, a
+ * phone, and eventually integration tests and CLI tooling.
+ *
+ * Mutations are HTTP POSTs; state arrives as a WebSocket push of the whole
+ * snapshot. Full snapshots are a deliberate simplification - the desk is tiny
+ * (tens of entities) and it removes a whole class of client/server drift bugs.
+ */
+export const SetMonitorSourceRequestSchema = z.object({
+  monitorId: z.string().min(1),
+  sourceComputerId: z.string().min(1),
+  /** Client-supplied idempotency key; the server generates one if omitted. */
+  commandId: z.string().min(1).optional(),
+});
+export type SetMonitorSourceRequest = z.infer<typeof SetMonitorSourceRequestSchema>;
+
+export const SetPeripheralOwnerRequestSchema = z.object({
+  peripheralId: z.string().min(1),
+  ownerComputerId: z.string().min(1),
+  commandId: z.string().min(1).optional(),
+});
+export type SetPeripheralOwnerRequest = z.infer<typeof SetPeripheralOwnerRequestSchema>;
+
+export const ApplyPresetRequestSchema = z.object({
+  presetId: z.string().min(1),
+});
+export type ApplyPresetRequest = z.infer<typeof ApplyPresetRequestSchema>;
+
+export const RenameRequestSchema = z.object({
+  entityType: z.enum(['computer', 'monitor', 'peripheral', 'preset']),
+  entityId: z.string().min(1),
+  /** null clears the custom name and falls back to the detected name. */
+  customName: z.string().min(1).max(120).nullable(),
+});
+export type RenameRequest = z.infer<typeof RenameRequestSchema>;
+
+export const CommandAcceptedResponseSchema = z.object({
+  accepted: z.boolean(),
+  commandIds: z.array(z.string()),
+  /** Targets that could not be actioned, with a machine-readable reason. */
+  skipped: z.array(z.object({ targetId: z.string(), reason: z.string() })).default([]),
+});
+export type CommandAcceptedResponse = z.infer<typeof CommandAcceptedResponseSchema>;
+
+export const ApiErrorResponseSchema = z.object({
+  error: z.object({ code: z.string(), message: z.string() }),
+});
+export type ApiErrorResponse = z.infer<typeof ApiErrorResponseSchema>;
+
+/** WebSocket frames pushed to UI clients. */
+export const UiServerMessageSchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('snapshot'), snapshot: DeskSnapshotSchema }),
+  z.object({ type: z.literal('pong'), sentAt: z.string() }),
+]);
+export type UiServerMessage = z.infer<typeof UiServerMessageSchema>;
