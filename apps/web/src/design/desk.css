@@ -1,0 +1,267 @@
+/*
+ * Desk-specific composition. Everything here is layout and the monitor map -
+ * the one genuinely bespoke surface in the app. All values come from tokens.
+ */
+
+/* ---------- header ---------- */
+
+.desk-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-5);
+  padding-bottom: var(--space-5);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.desk-brand-title {
+  font-size: var(--text-3xl);
+  font-weight: var(--weight-bold);
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+.desk-brand-sub {
+  margin-top: var(--space-3);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  letter-spacing: var(--tracking-brand);
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+.desk-header-right {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+}
+
+.desk-clock {
+  text-align: right;
+  line-height: 1.15;
+}
+
+.desk-clock-date {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.desk-clock-time {
+  font-size: var(--text-2xl);
+  font-weight: var(--weight-bold);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- desk map ---------- */
+
+.desk-map {
+  position: relative;
+  /*
+   * Fill the stage without ever cropping: the width is capped both by the
+   * column and by how much height is actually left over, so the desk stays
+   * fully visible on a wide monitor and on a 7" panel alike.
+   */
+  --map-available-height: calc(100vh - 320px);
+  width: min(100%, calc(var(--map-available-height) * var(--map-aspect, 1.6)));
+  aspect-ratio: var(--map-aspect, 1.6);
+  margin: auto;
+}
+
+@media (max-width: 1180px) {
+  .desk-map {
+    --map-available-height: 52vh;
+  }
+}
+
+.desk-map-note {
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
+}
+
+.monitor {
+  position: absolute;
+  container-type: size;
+  padding: 0;
+  background: none;
+  border: none;
+}
+
+.monitor-frame {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-md);
+  padding: clamp(4px, 2cqw, 9px);
+  background: linear-gradient(180deg, #23272e 0%, #14171c 100%);
+  border: 1px solid var(--border-strong);
+  box-shadow: var(--shadow-screen);
+  transition:
+    border-color var(--duration-base) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
+}
+
+button.monitor:hover .monitor-frame {
+  border-color: rgba(255, 255, 255, 0.28);
+}
+
+button.monitor:active .monitor-frame {
+  transform: scale(0.99);
+}
+
+.monitor[data-status='switching'] .monitor-frame {
+  border-color: var(--tone-busy-border);
+}
+.monitor[data-status='failed'] .monitor-frame {
+  border-color: var(--tone-bad-border);
+}
+.monitor[data-status='unreachable'] .monitor-frame,
+.monitor[data-status='drifted'] .monitor-frame {
+  border-color: var(--tone-warn-border);
+}
+
+.monitor-screen {
+  position: absolute;
+  inset: clamp(4px, 2cqw, 9px);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  transition: filter var(--duration-base) var(--ease-out);
+}
+
+.monitor-screen::after {
+  /* Soft highlight so the panel reads as glass rather than flat colour. */
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(120% 80% at 30% 0%, rgba(255, 255, 255, 0.16), transparent 60%),
+    linear-gradient(180deg, transparent 45%, rgba(0, 0, 0, 0.55) 100%);
+}
+
+.monitor-watermark {
+  color: #fff;
+  opacity: 0.22;
+  transform: scale(clamp(1.6, 0.16cqmin, 4));
+}
+
+.monitor-overlay {
+  position: absolute;
+  inset: clamp(4px, 2cqw, 9px);
+  padding: clamp(6px, 3cqmin, 14px);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: stretch;
+  pointer-events: none;
+}
+
+.monitor-head {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  text-align: left;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.65);
+}
+
+.monitor-name {
+  font-size: clamp(11px, 7cqmin, 17px);
+  font-weight: var(--weight-bold);
+  line-height: 1.1;
+  color: #fff;
+}
+
+.monitor-format {
+  font-size: clamp(9px, 5cqmin, 13px);
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.monitor-foot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(2px, 1.5cqmin, 6px);
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.7);
+}
+
+.monitor-source {
+  font-size: clamp(13px, 9cqmin, 24px);
+  font-weight: var(--weight-bold);
+  line-height: 1.1;
+  color: #fff;
+  text-align: center;
+}
+
+.monitor-source.is-stale {
+  color: rgba(255, 255, 255, 0.6);
+  font-style: italic;
+}
+
+.monitor-connector {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: clamp(9px, 5cqmin, 13px);
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.monitor-pending {
+  font-size: clamp(9px, 5cqmin, 13px);
+  color: var(--tone-busy);
+  font-weight: var(--weight-medium);
+}
+
+.monitor-badge {
+  position: absolute;
+  top: clamp(6px, 3cqmin, 14px);
+  right: clamp(6px, 3cqmin, 14px);
+}
+
+.monitor-error {
+  position: absolute;
+  left: clamp(6px, 3cqmin, 14px);
+  right: clamp(6px, 3cqmin, 14px);
+  bottom: clamp(6px, 3cqmin, 14px);
+  font-size: clamp(9px, 4.5cqmin, 12px);
+  color: #ffd7d3;
+  text-align: center;
+}
+
+/* ---------- footer ---------- */
+
+.desk-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--border-subtle);
+  font-size: var(--text-sm);
+}
+
+.desk-footer-item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--text-secondary);
+}
+
+.desk-footer-item[data-tone='ok'] {
+  color: var(--tone-ok);
+}
+.desk-footer-item[data-tone='busy'] {
+  color: var(--tone-busy);
+}
+.desk-footer-item[data-tone='warn'] {
+  color: var(--tone-warn);
+}
+.desk-footer-item[data-tone='bad'] {
+  color: var(--tone-bad);
+}
+
+.desk-loading {
+  display: grid;
+  place-items: center;
+  min-height: 40vh;
+  color: var(--text-tertiary);
+  gap: var(--space-4);
+}

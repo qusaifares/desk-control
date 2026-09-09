@@ -59,6 +59,20 @@ export class DeskStore {
    * the next command through - never to tell the user what is on screen.
    */
   private readonly lastKnownActiveInputs = new Map<string, string>();
+  /**
+   * `monitorId:agentId` pairs we have *proved* can talk DDC without holding the
+   * live input.
+   *
+   * Agents report `requiresActiveInput: true` conservatively, because being
+   * wrong that way costs a refused command while being wrong the other way
+   * sends commands into a void. But plenty of panels answer DDC over an
+   * inactive input, and when one demonstrably does we should stop pretending
+   * otherwise - it widens the set of agents that can drive that monitor.
+   *
+   * A hardware fact, so it is never persisted: it is re-learned from scratch on
+   * every boot rather than surviving a re-cabled desk.
+   */
+  private readonly provenActiveInputIndependence = new Set<string>();
 
   desired: DesiredState = { monitorSources: {}, peripheralOwners: {}, activePresetId: null };
 
@@ -198,7 +212,10 @@ export class DeskStore {
         localHandle: report.localHandle,
         inputId: report.connectedViaInputId,
         capabilities: report.capabilities,
-        requiresActiveInput: report.requiresActiveInput,
+        // A re-discovery must not throw away what we have already proved.
+        requiresActiveInput:
+          report.requiresActiveInput &&
+          !this.provenActiveInputIndependence.has(`${report.stableId}:${agentId}`),
       });
 
       this.ensurePlacement(report.stableId);
@@ -301,6 +318,7 @@ export class DeskStore {
       this.observations.set(report.stableId, perMonitor);
       if (report.reachability === 'reachable' && report.activeInputId) {
         this.noteActiveInput(report.stableId, report.activeInputId);
+        this.noteActiveInputIndependence(report.stableId, agentId, report.activeInputId);
       }
     }
     this.touch();
@@ -343,6 +361,26 @@ export class DeskStore {
       reportedByAgentId: best.agentId,
       lastError: best.report.error,
     };
+  }
+
+  /**
+   * An agent that reads a monitor while some *other* input is live has just
+   * proved it does not need the active input. Record it and widen that control
+   * path immediately, rather than waiting for the next inventory.
+   */
+  private noteActiveInputIndependence(
+    monitorId: string,
+    agentId: string,
+    observedActiveInputId: string,
+  ): void {
+    const monitor = this.monitors.get(monitorId);
+    const path = monitor?.controlPaths.find((candidate) => candidate.agentId === agentId);
+    if (!monitor || !path || !path.requiresActiveInput) return;
+    // Unknown wiring proves nothing; the agent may well be on the live input.
+    if (path.inputId === null || path.inputId === observedActiveInputId) return;
+
+    this.provenActiveInputIndependence.add(`${monitorId}:${agentId}`);
+    path.requiresActiveInput = false;
   }
 
   noteActiveInput(monitorId: string, inputId: string): void {

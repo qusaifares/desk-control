@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { buildWindowsMonitorIdentity, normalizeDeviceKey } from './device-id.js';
+import { parseEdidHex } from './edid.js';
+import { buildDdcMonitorIdentity, normalizeDeviceKey } from './identity.js';
 
 describe('normalizeDeviceKey', () => {
   it('joins the two ways Windows names the same monitor', () => {
@@ -19,18 +20,13 @@ describe('normalizeDeviceKey', () => {
   });
 });
 
-describe('buildWindowsMonitorIdentity', () => {
-  const edid = {
-    instanceName: 'DISPLAY\\AUS276D\\7&2d237c0c&0&UID16641_0',
-    manufacturerId: 'AUS',
-    friendlyName: 'PA278CV',
-    productCode: '276D',
-    serial: 'N6LMQS137321',
-    yearOfManufacture: 2022,
-  };
+describe('buildDdcMonitorIdentity', () => {
+  const PA278CV_EDID =
+    '00ffffffffffff0006b36d27010101011a200104a53c22783be4a5a6544c9e260d5054bf4f00714f818081409500a940b300d100e1c0565e00a0a0a029503020350055502100001a000000fd001e4b70701e010a202020202020000000fc00504132373843560a2020202020000000ff004e364c4d51533133373332310a013b020323f14a900403021112131f05142309070783010000e2006a681a00000101304b007c2e00a0a0a015503020350055502100001a9774006ea0a034501720680855502100001a9e20009051201f304880360055502100001ccd4600a0a0381f4030203a0055502100001a0e1f008051001e304080370055502100001c00000e';
+  const edid = parseEdidHex(PA278CV_EDID);
 
-  it('derives a stable id from EDID only, never from Windows-shaped paths', () => {
-    const identity = buildWindowsMonitorIdentity({
+  it('derives a stable id from EDID only, never from platform-shaped handles', () => {
+    const identity = buildDdcMonitorIdentity({
       edid,
       capabilitiesModel: 'PA278CV',
       fallbackDisambiguator: '\\\\.\\DISPLAY1',
@@ -41,23 +37,24 @@ describe('buildWindowsMonitorIdentity', () => {
     expect(identity.stableId).not.toContain('display1');
   });
 
-  it('produces the same id if the monitor moves to a different adapter', () => {
-    const a = buildWindowsMonitorIdentity({
+  it('computes the same id from a Windows handle and a macOS-style handle', () => {
+    const fromWindows = buildDdcMonitorIdentity({
       edid,
       capabilitiesModel: 'PA278CV',
       fallbackDisambiguator: '\\\\.\\DISPLAY1',
     });
-    const b = buildWindowsMonitorIdentity({
-      edid: { ...edid, instanceName: 'DISPLAY\\AUS276D\\7&other&0&UID99_0' },
+    const fromMac = buildDdcMonitorIdentity({
+      edid,
       capabilitiesModel: 'PA278CV',
-      fallbackDisambiguator: '\\\\.\\DISPLAY4',
+      fallbackDisambiguator: 'IOAVService:4',
     });
-    expect(a.stableId).toBe(b.stableId);
+    // This equality is what lets the controller merge two agents' control paths.
+    expect(fromWindows.stableId).toBe(fromMac.stableId);
   });
 
   it('falls back to the DDC-reported model and flags a weak identity with no serial', () => {
-    const identity = buildWindowsMonitorIdentity({
-      edid: { ...edid, serial: null, friendlyName: null },
+    const identity = buildDdcMonitorIdentity({
+      edid: { ...edid, serial: null, monitorName: null },
       capabilitiesModel: 'PA278CV',
       fallbackDisambiguator: '\\\\.\\DISPLAY1',
     });
@@ -66,11 +63,11 @@ describe('buildWindowsMonitorIdentity', () => {
     expect(identity.stableId).toContain('display1');
   });
 
-  it('still yields an identity when WMI is unavailable entirely', () => {
-    const identity = buildWindowsMonitorIdentity({
+  it('still yields an identity when EDID is unreadable entirely', () => {
+    const identity = buildDdcMonitorIdentity({
       edid: null,
       capabilitiesModel: 'PA279CV',
-      fallbackDisambiguator: '\\\\.\\DISPLAY2',
+      fallbackDisambiguator: 'IOAVService:2',
     });
     expect(identity.manufacturerId).toBe('UNK');
     expect(identity.model).toBe('PA279CV');

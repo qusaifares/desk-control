@@ -37,6 +37,7 @@ export const MonitorReportSchema = z.object({
     serial: z.string().nullable().default(null),
     manufactureYear: z.number().int().nullable().default(null),
     weakIdentity: z.boolean().default(false),
+    physicalSizeInches: z.number().positive().nullable().default(null),
   }),
   capabilities: z.array(MonitorCapabilitySchema).default([]),
   inputs: z.array(MonitorInputReportSchema).default([]),

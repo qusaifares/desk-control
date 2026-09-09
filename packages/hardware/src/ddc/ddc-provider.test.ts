@@ -1,9 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { BridgeRequestError, type DdcBridge } from './powershell-bridge.js';
-import { WindowsDdcMonitorControlProvider } from './windows-ddc-provider.js';
+import { DdcMonitorControlProvider } from './ddc-provider.js';
+import { BridgeRequestError } from './process-bridge.js';
+import type { DdcBridge } from './types.js';
 
 const DEVICE_ID =
   '\\\\?\\DISPLAY#AUS276D#7&2d237c0c&0&UID16641#{e6f07b5f-ee97-4a90-b076-33f57bf4eaa7}';
+
+const PA278CV_EDID =
+  '00ffffffffffff0006b36d27010101011a200104a53c22783be4a5a6544c9e260d5054bf4f00714f818081409500a940b300d100e1c0565e00a0a0a029503020350055502100001a000000fd001e4b70701e010a202020202020000000fc00504132373843560a2020202020000000ff004e364c4d51533133373332310a013b020323f14a900403021112131f05142309070783010000e2006a681a00000101304b007c2e00a0a0a015503020350055502100001a9774006ea0a034501720680855502100001a9e20009051201f304880360055502100001ccd4600a0a0381f4030203a0055502100001a0e1f008051001e304080370055502100001c00000e';
 
 const CAPS =
   '(prot(monitor)type(LCD)model(PA278CV)cmds(01 02 03 07 0C E3 F3)vcp(10 12 60(11 0F 10) 62 D6(01 04 05))mswhql(1)mccs_ver(2.2))';
@@ -11,6 +15,7 @@ const CAPS =
 /** Stands in for the PowerShell host, recording what the provider asked for. */
 class FakeBridge implements DdcBridge {
   readonly calls: Array<{ op: string; params: Record<string, unknown> }> = [];
+  capabilitiesString: string = CAPS;
   activeInput = 0x0f;
   /** Set to make every DDC read fail, as a panel does on an inactive input. */
   unreadable = false;
@@ -28,23 +33,14 @@ class FakeBridge implements DdcBridge {
           monitors: [
             {
               deviceId: DEVICE_ID,
-              adapter: '\\\\.\\DISPLAY1',
               description: 'Generic PnP Monitor',
-              isPrimary: true,
-              capabilities: CAPS,
+              capabilities: this.capabilitiesString,
               capabilitiesError: null,
+              fallbackDisambiguator: '\\\\.\\DISPLAY1',
             },
           ],
-          edid: [
-            {
-              instanceName: 'DISPLAY\\AUS276D\\7&2d237c0c&0&UID16641_0',
-              manufacturerId: 'AUS',
-              friendlyName: 'PA278CV',
-              productCode: '276D',
-              serial: 'N6LMQS137321',
-              yearOfManufacture: 2022,
-            },
-          ],
+          // The real EDID block for this panel, joined by device key.
+          edid: [{ key: 'DISPLAY\\AUS276D\\7&2d237c0c&0&UID16641_0', edidHex: PA278CV_EDID }],
         } as T;
 
       case 'observe':
@@ -76,11 +72,11 @@ class FakeBridge implements DdcBridge {
 }
 
 function makeProvider(bridge: FakeBridge) {
-  return new WindowsDdcMonitorControlProvider({ bridge, verifyIntervalMs: 1 });
+  return new DdcMonitorControlProvider({ kind: 'test-ddc', bridge, verifyIntervalMs: 1 });
 }
 
-describe('WindowsDdcMonitorControlProvider', () => {
-  it('produces an EDID-derived stable id that a non-Windows agent would also produce', async () => {
+describe('DdcMonitorControlProvider', () => {
+  it('derives the stable id from raw EDID, so every platform computes the same one', async () => {
     const monitors = await makeProvider(new FakeBridge()).discoverMonitors();
     expect(monitors).toHaveLength(1);
     expect(monitors[0]?.stableId).toBe('monitor:aus:pa278cv:n6lmqs137321');
@@ -194,29 +190,14 @@ describe('WindowsDdcMonitorControlProvider', () => {
 
   it('refuses a monitor that does not advertise input switching', async () => {
     const bridge = new FakeBridge();
+    bridge.capabilitiesString = '(prot(monitor)model(BASIC)vcp(10 12))';
     const provider = makeProvider(bridge);
     const monitors = await provider.discoverMonitors();
 
-    // Strip the capability the way a basic panel would report it.
-    const stripped = new WindowsDdcMonitorControlProvider({
-      bridge: new (class extends FakeBridge {
-        override async request<T>(op: string, params: Record<string, unknown> = {}): Promise<T> {
-          if (op === 'list') {
-            const listing = (await super.request('list', params)) as {
-              monitors: Array<{ capabilities: string }>;
-              edid: unknown;
-            };
-            listing.monitors[0]!.capabilities = '(prot(monitor)model(BASIC)vcp(10 12))';
-            return listing as T;
-          }
-          return super.request<T>(op, params);
-        }
-      })(),
-      verifyIntervalMs: 1,
-    });
-    await stripped.discoverMonitors();
+    expect(monitors[0]?.capabilities).not.toContain('input-switch');
+    expect(monitors[0]?.inputs).toHaveLength(0);
 
-    const result = await stripped.setInput({
+    const result = await provider.setInput({
       stableId: monitors[0]!.stableId,
       localHandle: monitors[0]!.localHandle,
       inputId: 'input-0x11',

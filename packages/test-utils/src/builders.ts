@@ -55,6 +55,7 @@ export function aMonitor(overrides: Partial<Monitor> = {}): Monitor {
       serial: '0001',
       manufactureYear: 2024,
       weakIdentity: false,
+      physicalSizeInches: 27,
     },
     capabilities: ['input-switch'],
     inputs: [anInput()],

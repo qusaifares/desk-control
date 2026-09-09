@@ -37,6 +37,7 @@ export class MockMonitorControlProvider implements MonitorControlProvider {
           serial: monitor.serial,
           manufactureYear: monitor.manufactureYear,
           weakIdentity: monitor.serial === null,
+          physicalSizeInches: monitor.physicalSizeInches ?? null,
         },
         capabilities: monitor.capabilities,
         inputs: monitor.inputs.map((input) => ({

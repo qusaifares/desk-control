@@ -128,12 +128,21 @@ docs/
 - [docs/protocol.md](docs/protocol.md) — wire protocol, versioning, errors, security roadmap
 - [docs/hardware.md](docs/hardware.md) — control plane vs data plane, DDC/CI realities
 - [docs/development.md](docs/development.md) — environment, workflows, simulator control API
+- [docs/design-system.md](docs/design-system.md) — tokens, primitives, and how to build a new screen
 - [CLAUDE.md](CLAUDE.md) — invariants and conventions for future work in this repo
 
 ## Real hardware
 
-The Windows provider is real. On a Windows machine (or WSL on one — the DDC bridge reaches the
-displays either way):
+Both DDC providers are the _same_ code over a different transport: a Windows helper over
+`dxva2.dll`, a macOS helper over IOAVService I2C. Identity, capability parsing, wiring inference and
+switch verification are shared, so a panel gets the same EDID-derived id whichever machine sees it —
+which is what lets the controller merge two agents into one monitor with two control paths.
+
+The Windows path has been verified end to end against physical monitors, including a live input
+switch. **The macOS path has not been run on a Mac yet** — see [docs/hardware.md](docs/hardware.md)
+for exactly what to expect when you first try it.
+
+On a Windows machine (or WSL on one — the DDC bridge reaches the displays either way):
 
 ```bash
 pnpm --filter @desk-control/agent exec tsx src/index.ts probe
@@ -157,7 +166,11 @@ to arrange:
 pnpm --filter @desk-control/agent exec tsx src/index.ts --controller ws://127.0.0.1:7420/agent
 ```
 
+On a Mac, the same command builds a small helper with `clang` (Xcode Command Line Tools) and probes
+over IOAVService.
+
 ## Next milestone
 
-macOS DDC, so a MacBook becomes both a source and a control path — see the end of
-[docs/hardware.md](docs/hardware.md).
+Verify the macOS provider on a real MacBook, then wire that Mac to a monitor the Windows PC also
+sees — that is the first time two agents share a panel and control-path merging stops being theory.
+Details at the end of [docs/hardware.md](docs/hardware.md).

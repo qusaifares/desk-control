@@ -1,24 +1,11 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { execFileSync } from 'node:child_process';
-import { createHash } from 'node:crypto';
-import { existsSync, readFileSync } from 'node:fs';
-import { mkdir, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { DDC_BRIDGE_SCRIPT } from './ddc-bridge-script.js';
+import { readFileSync } from 'node:fs';
+import type { DdcBridge } from './types.js';
 
 export interface BridgeError {
   code: string;
   message: string;
-}
-
-export interface DdcBridge {
-  request<TResult>(
-    op: string,
-    params: Record<string, unknown>,
-    timeoutMs: number,
-  ): Promise<TResult>;
-  dispose(): Promise<void>;
 }
 
 interface Pending {
@@ -48,30 +35,48 @@ export function isWsl(): boolean {
 }
 
 /**
- * powershell.exe needs a Windows path. Under WSL the script lives on the Linux
- * filesystem, so translate it; running natively on Windows the path is already
- * correct.
+ * Translates a Linux path for a Windows binary. Under WSL the helper script
+ * lives on the Linux filesystem but powershell.exe needs a Windows path;
+ * running natively on Windows the path is already correct.
  */
-function toWindowsPath(path: string): string {
+export function toWindowsPath(path: string): string {
   if (!isWsl()) return path;
   return execFileSync('wslpath', ['-w', path], { encoding: 'utf8' }).trim();
 }
 
-function powershellExecutable(): string {
-  if (process.platform === 'win32') return 'powershell.exe';
-  // Under WSL, interop puts the Windows binary on PATH.
-  return 'powershell.exe';
+export interface ProcessBridgeOptions {
+  /** Used in error messages, e.g. "Windows DDC bridge". */
+  name: string;
+  /**
+   * Produces the command to spawn. Called on every (re)start, so a helper that
+   * needs compiling or writing to disk can do that here, once, and cache.
+   */
+  resolveCommand(): Promise<{ command: string; args: string[] }>;
+  startupTimeoutMs?: number;
+  /**
+   * Encodes an outgoing request line. Defaults to JSON.
+   *
+   * The macOS helper overrides this with a plain-text form, because writing a
+   * JSON parser in C to read our own fixed request shapes would be all risk and
+   * no benefit. Replies are JSON in both directions - emitting JSON is easy
+   * anywhere, parsing it is not.
+   */
+  encodeRequest?(id: string, op: string, params: Record<string, unknown>): string;
 }
 
 /**
- * Long-lived PowerShell host speaking one JSON object per line.
+ * A long-lived helper process speaking one JSON object per line.
  *
- * The process is started lazily and restarted on demand: if it dies (a display
- * driver reset can take it down), the next request brings up a fresh one rather
- * than failing forever. In-flight requests are rejected rather than left
- * hanging, so a command surfaces as a failure instead of a timeout.
+ * Both platform helpers use this: the expensive setup - compiling a P/Invoke
+ * type, opening IOKit services - happens once at startup, after which each
+ * operation costs a line in and a line out.
+ *
+ * The process starts lazily and restarts on demand. If it dies (a display
+ * driver reset can take it down) the next request brings up a fresh one rather
+ * than failing forever, and in-flight requests are rejected rather than left to
+ * hang, so a command surfaces as a failure instead of a timeout.
  */
-export class PowerShellDdcBridge implements DdcBridge {
+export class JsonLineProcessBridge implements DdcBridge {
   private child: ChildProcessWithoutNullStreams | null = null;
   private starting: Promise<void> | null = null;
   private readonly pending = new Map<string, Pending>();
@@ -79,22 +84,15 @@ export class PowerShellDdcBridge implements DdcBridge {
   private counter = 0;
   private disposed = false;
 
-  constructor(private readonly startupTimeoutMs = 20_000) {}
+  constructor(private readonly options: ProcessBridgeOptions) {}
 
-  private async scriptPath(): Promise<string> {
-    const digest = createHash('sha256').update(DDC_BRIDGE_SCRIPT).digest('hex').slice(0, 12);
-    const directory = join(tmpdir(), 'desk-control');
-    const path = join(directory, `ddc-bridge-${digest}.ps1`);
-    if (!existsSync(path)) {
-      await mkdir(directory, { recursive: true });
-      // BOM so PowerShell reads it as UTF-8 regardless of console codepage.
-      await writeFile(path, `\ufeff${DDC_BRIDGE_SCRIPT}`, 'utf8');
-    }
-    return path;
+  private get startupTimeoutMs(): number {
+    return this.options.startupTimeoutMs ?? 20_000;
   }
 
   private async ensureStarted(): Promise<void> {
-    if (this.disposed) throw new BridgeRequestError('INTERNAL', 'Bridge has been disposed');
+    if (this.disposed)
+      throw new BridgeRequestError('INTERNAL', `${this.options.name} was disposed`);
     if (this.child) return;
     if (this.starting) return this.starting;
 
@@ -105,12 +103,8 @@ export class PowerShellDdcBridge implements DdcBridge {
   }
 
   private async start(): Promise<void> {
-    const script = toWindowsPath(await this.scriptPath());
-    const child = spawn(
-      powershellExecutable(),
-      ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', script],
-      { stdio: ['pipe', 'pipe', 'pipe'] },
-    );
+    const { command, args } = await this.options.resolveCommand();
+    const child = spawn(command, args, { stdio: ['pipe', 'pipe', 'pipe'] });
 
     child.stdout.setEncoding('utf8');
     child.stdout.on('data', (chunk: string) => this.onData(chunk));
@@ -118,7 +112,7 @@ export class PowerShellDdcBridge implements DdcBridge {
 
     let stderr = '';
     child.stderr.on('data', (chunk: string) => {
-      // Kept for the error message only; the protocol never uses stderr.
+      // Kept for error messages only; the protocol never uses stderr.
       stderr = `${stderr}${chunk}`.slice(-4000);
     });
 
@@ -128,7 +122,7 @@ export class PowerShellDdcBridge implements DdcBridge {
         this.child = null;
         const failure = new BridgeRequestError(
           'DEVICE_UNREACHABLE',
-          `DDC bridge exited (code ${code}). ${stderr.trim()}`.trim(),
+          `${this.options.name} exited (code ${code}). ${stderr.trim()}`.trim(),
         );
         for (const [id, pending] of this.pending) {
           clearTimeout(pending.timer);
@@ -144,7 +138,7 @@ export class PowerShellDdcBridge implements DdcBridge {
         reject(
           new BridgeRequestError(
             'TIMEOUT',
-            `DDC bridge did not become ready within ${this.startupTimeoutMs}ms`,
+            `${this.options.name} did not become ready within ${this.startupTimeoutMs}ms`,
           ),
         );
       }, this.startupTimeoutMs);
@@ -197,7 +191,7 @@ export class PowerShellDdcBridge implements DdcBridge {
       pending.reject(
         new BridgeRequestError(
           message.error?.code ?? 'INTERNAL',
-          message.error?.message ?? 'DDC bridge reported an unspecified failure',
+          message.error?.message ?? `${this.options.name} reported an unspecified failure`,
         ),
       );
     }
@@ -210,7 +204,9 @@ export class PowerShellDdcBridge implements DdcBridge {
   ): Promise<TResult> {
     await this.ensureStarted();
     const child = this.child;
-    if (!child) throw new BridgeRequestError('DEVICE_UNREACHABLE', 'DDC bridge is not running');
+    if (!child) {
+      throw new BridgeRequestError('DEVICE_UNREACHABLE', `${this.options.name} is not running`);
+    }
 
     this.counter += 1;
     const id = `r${this.counter}`;
@@ -229,7 +225,11 @@ export class PowerShellDdcBridge implements DdcBridge {
         timer,
       });
 
-      child.stdin.write(`${JSON.stringify({ id, op, ...params })}\n`, (error) => {
+      const line = this.options.encodeRequest
+        ? this.options.encodeRequest(id, op, params)
+        : JSON.stringify({ id, op, ...params });
+
+      child.stdin.write(`${line}\n`, (error) => {
         if (!error) return;
         this.pending.delete(id);
         clearTimeout(timer);
@@ -244,7 +244,7 @@ export class PowerShellDdcBridge implements DdcBridge {
     this.child = null;
     if (!child) return;
     child.stdin.end();
-    // Give PowerShell a moment to exit its read loop before forcing it.
+    // Give the helper a moment to leave its read loop before forcing it.
     await new Promise<void>((resolve) => {
       const timer = setTimeout(() => {
         child.kill();

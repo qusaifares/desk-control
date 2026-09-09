@@ -1,8 +1,11 @@
 import { buildMonitorId } from '@desk-control/domain';
+import type { EdidIdentity } from './edid.js';
 
 /**
- * Windows names the same monitor two different ways, and they have to be joined
- * before an EDID serial can be attached to a DDC handle.
+ * Normalises the several ways a platform can name the same display, so raw EDID
+ * can be joined to a DDC handle without relying on enumeration order.
+ *
+ * Windows is the awkward case - it names one monitor two different ways:
  *
  *   WMI WmiMonitorID.InstanceName
  *     DISPLAY\AUS276D\7&2d237c0c&0&UID16641_0
@@ -12,8 +15,10 @@ import { buildMonitorId } from '@desk-control/domain';
  *
  * Same device, different punctuation, plus a trailing instance ordinal on one
  * and an interface GUID on the other. Normalising both to
- * `display\aus276d\7&2d237c0c&0&uid16641` makes the join exact rather than a
- * guess based on ordering.
+ * `display\aus276d\7&2d237c0c&0&uid16641` makes the join exact.
+ *
+ * On platforms whose helper already keys EDID by the same handle it reports for
+ * the monitor - macOS does - this is simply a case fold.
  */
 export function normalizeDeviceKey(value: string): string {
   const withoutPrefix = value.replace(/^\\\\[?.]\\/, '');
@@ -31,16 +36,7 @@ export function normalizeDeviceKey(value: string): string {
   return keep.join('\\').toLowerCase();
 }
 
-export interface WindowsEdidRecord {
-  instanceName: string;
-  manufacturerId: string;
-  friendlyName: string | null;
-  productCode: string | null;
-  serial: string | null;
-  yearOfManufacture: number | null;
-}
-
-export interface WindowsMonitorIdentity {
+export interface DdcMonitorIdentity {
   stableId: string;
   detectedName: string;
   manufacturerId: string;
@@ -48,28 +44,29 @@ export interface WindowsMonitorIdentity {
   serial: string | null;
   manufactureYear: number | null;
   weakIdentity: boolean;
+  physicalSizeInches: number | null;
 }
 
 /**
- * Builds the cross-platform stable id from Windows-specific facts.
+ * Builds the stable id every platform must agree on.
  *
- * The id must come out identical to what a macOS or Linux agent computes for
- * the same panel, because that is how the controller merges control paths. So
- * it is derived only from EDID values - manufacturer, model, serial - and never
- * from anything Windows-shaped like an adapter name or instance path.
+ * Derived only from EDID - manufacturer, model, serial - and never from
+ * anything platform-shaped like an adapter name or an IOKit path, because a
+ * Windows agent and a macOS agent looking at the same panel have to arrive at
+ * the same id or the controller cannot merge their control paths.
  *
- * `capabilitiesModel` is the model string the monitor reports over DDC, used
- * when EDID has no friendly name. `fallbackDisambiguator` is the adapter name,
- * used only for panels with no serial at all, which produces a weak identity.
+ * `capabilitiesModel` is the model the monitor reports over DDC, used when EDID
+ * carries no name. `fallbackDisambiguator` is a platform handle, used only for
+ * panels with no usable serial, which yields a weak identity.
  */
-export function buildWindowsMonitorIdentity(input: {
-  edid: WindowsEdidRecord | null;
+export function buildDdcMonitorIdentity(input: {
+  edid: EdidIdentity | null;
   capabilitiesModel: string | null;
   fallbackDisambiguator: string;
-}): WindowsMonitorIdentity {
+}): DdcMonitorIdentity {
   const manufacturerId = input.edid?.manufacturerId ?? 'UNK';
   const model =
-    input.edid?.friendlyName ??
+    input.edid?.monitorName ??
     input.capabilitiesModel ??
     input.edid?.productCode ??
     'Unknown monitor';
@@ -82,17 +79,18 @@ export function buildWindowsMonitorIdentity(input: {
     disambiguator: input.fallbackDisambiguator,
   });
 
-  const detectedName = input.edid?.friendlyName
-    ? `${manufacturerId} ${input.edid.friendlyName}`
+  const detectedName = input.edid?.monitorName
+    ? `${manufacturerId} ${input.edid.monitorName}`
     : (input.capabilitiesModel ?? model);
 
   return {
     stableId: id,
     detectedName,
+    manufactureYear: input.edid?.manufactureYear ?? null,
+    physicalSizeInches: input.edid?.physicalSizeInches ?? null,
     manufacturerId,
     model,
     serial,
-    manufactureYear: input.edid?.yearOfManufacture ?? null,
     weakIdentity: weak,
   };
 }

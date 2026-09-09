@@ -238,28 +238,87 @@ negotiate), brightness/power/volume operations (the capabilities are detected bu
 exist yet), and hotplug events (inventory refreshes on request, it does not subscribe to
 `WM_DISPLAYCHANGE`).
 
-## Recommended next milestone: macOS DDC
+## The macOS provider
 
-The Windows path proves the abstraction end to end on one machine. The next thing that changes what
-the system can _do_ is a second platform, because that is when two agents see the same panel and the
-control-path merging, the active-input routing and the wiring discovery stop being theory.
+Implemented. **Not yet verified on a Mac** — everything below that could be tested without one has
+been, and the part that could not is deliberately tiny.
 
-Scope:
+**Why it looks nothing like a second implementation.** It is the same
+`DdcMonitorControlProvider` as Windows. Identity, capability parsing, wiring inference, switch
+verification and idempotency are shared; only the transport differs. A bug fixed on one platform is
+fixed on both.
 
-1. **Enumerate + identify** — `CGGetOnlineDisplayList`, EDID via `IODisplayCreateInfoDictionary` /
-   the `IODisplayEDID` property. Produce the same `stableId` the Windows provider produces for the
-   same panel; that equality is the whole point and deserves a test.
-2. **DDC transport** — I2C over `IOAVService` on Apple Silicon (`IOAVServiceWriteI2C` /
-   `IOAVServiceReadI2C`), which is a different path from Intel Macs' `IOFramebufferI2C`. An M4 and an
-   M2 MacBook will both take the Apple Silicon path.
-3. **Bridge** — a small Swift or Objective-C helper speaking the same JSON line protocol the
-   PowerShell bridge uses, so the Node side is nearly identical.
-4. **Expect** — DDC over USB-C/Thunderbolt docks frequently does not work at all. Reporting
-   `unreachable` honestly is a correct outcome, not a bug to paper over.
-5. **Learn `requiresActiveInput`** — with two agents on one panel this stops being academic. After a
-   successful switch away, an agent that can still read the monitor has proved the flag false for
-   that panel; record it so `selectControlPath()` can use either machine.
+**The transport.** On Apple Silicon there is no `dxva2.dll` equivalent: the only route to a monitor
+is raw I2C through the private `IOAVService` API, reachable only from native code. So a small C
+helper is compiled on first run with `clang` (Xcode Command Line Tools) and cached by source hash.
 
-Definition of done: the M4 MacBook and this Windows PC both register agents, the controller merges
-them into one monitor with two control paths, and a switch initiated from either machine is routed
-through whichever agent currently holds the live input.
+**What the helper does, in full:** enumerate `DCPAVServiceProxy` entries whose `Location` is
+`External`, copy each display's EDID, and move bytes over I2C. That is all. Every DDC packet -
+framing, checksums, the fragmented capabilities request, EDID decoding, identity - is built and
+parsed in TypeScript, under test.
+
+That split is the whole design. The untestable-without-a-Mac surface is roughly 120 lines of C with
+obvious failure modes; the fiddly parts live where they can be exercised:
+
+| Tested here                          | How                                                                                                            |
+| ------------------------------------ | -------------------------------------------------------------------------------------------------------------- |
+| EDID decoding                        | Against four real EDID blocks pulled from this desk, cross-checked against what Windows independently reported |
+| Stable id equality across platforms  | A Windows handle and a macOS-style handle must yield the same id from the same EDID                            |
+| DDC/CI get/set framing and checksums | Byte-exact expectations                                                                                        |
+| Reply parsing                        | Located by signature, so it survives platforms that include or omit the leading address byte                   |
+| Fragmented capabilities request      | Reassembly, termination, and a panel that replays one fragment forever                                         |
+| The whole macOS bridge               | Against a fake that decodes real frames and answers with spec-shaped replies                                   |
+
+**Text in, JSON out.** The helper reads plain-text commands rather than JSON, because writing a JSON
+parser in C to read our own fixed request shapes would be all risk and no benefit. Replies are JSON,
+which is easy to emit anywhere.
+
+### What to expect the first time it runs on a Mac
+
+- **`clang` must be present.** Missing Command Line Tools produces a message saying exactly that,
+  not a monitor reported as unreachable.
+- **The private symbols must still link.** `IOAVServiceCreateWithService`, `IOAVServiceCopyEDID`,
+  `IOAVServiceReadI2C` and `IOAVServiceWriteI2C` are not in any public header. If Apple removes them
+  the helper fails to build and says so.
+- **DDC over Thunderbolt and USB-C docks frequently does not work at all.** Reporting `unreachable`
+  is the correct outcome there, not a bug to paper over.
+- **The built-in display is skipped** by the `External` filter; it has no DDC to speak of.
+- **Reply framing is the likeliest thing to be wrong.** `probe` prints what each panel reported, and
+  parsing is done in TypeScript, so a fix is a one-line change with a test rather than a C rebuild.
+
+Run `pnpm --filter @desk-control/agent exec tsx src/index.ts probe` on the Mac. It only reads.
+
+## `requiresActiveInput` is now learned, not just guessed
+
+Agents still report `requiresActiveInput: true` conservatively. But the controller now _proves_ the
+opposite when it can: an agent that reads a monitor while some **other** input is live has
+demonstrated it does not need the live input, and its control path is widened immediately.
+
+That was prompted by real measurement - an ASUS PA279CV on this desk kept answering DDC over its
+HDMI cable while displaying DisplayPort. The proof only arises once two agents share a panel, which
+is why it lands with the macOS work.
+
+It is a hardware fact, so it is never persisted: it is re-learned from scratch on every boot rather
+than surviving a re-cabled desk.
+
+## Recommended next milestone: two agents on one panel
+
+Verify the macOS provider on a real MacBook, then cable that Mac to a monitor the Windows PC also
+sees. That is the first configuration where the interesting parts of this architecture actually run:
+
+1. **Identity merging** - both agents report the same EDID-derived id, and the controller folds them
+   into one monitor with two control paths and a union of capabilities.
+2. **Wiring discovery** - each agent contributes the input its own cable occupies, so the desk map
+   fills itself in with no user input.
+3. **Active-input routing** - a switch is dispatched through whichever agent currently holds the
+   live input, and after the switch the _other_ agent is asked to observe.
+4. **Independence learning** - if the panel answers DDC from both machines, both control paths widen
+   and either can drive it.
+
+Definition of done: switch that shared monitor between the PC and the MacBook from the web UI, in
+both directions, with observed state confirmed by reading the hardware back each time - and with the
+originating agent varying automatically as the live input moves.
+
+Worth expecting: the two machines may disagree about the monitor's capabilities string, and USB-C
+input codes outside the MCCS set (0x1B is common) will show up as vendor-specific inputs. Both are
+handled, and both are worth confirming rather than assuming.

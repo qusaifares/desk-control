@@ -107,6 +107,16 @@ On first run the controller writes `.data/desk-config.json` seeded from the exam
 hand; it is plain JSON and is validated on load. An invalid file is moved aside rather than deleted,
 and the controller falls back to defaults.
 
+## UI work
+
+`apps/web` is built on a small design system in `apps/web/src/design`. Read
+[design-system.md](design-system.md) before adding a screen: compose the primitives and use the
+tokens, and a new page matches the rest of the app without any visual decisions being re-made.
+
+Note that the dev controller writes its config to `apps/controller/.data`, not the repository root,
+because Turborepo runs each script in its own package directory. Delete that directory to re-seed
+the example desk.
+
 ## Monorepo conventions
 
 **Internal packages are source-only.** `packages/*` expose `./src/index.ts` directly and have no

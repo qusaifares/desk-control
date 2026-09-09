@@ -102,6 +102,8 @@ export const MonitorIdentitySchema = z.object({
   manufactureYear: z.number().int().nullable().default(null),
   /** True when identity had to fall back to a port-based disambiguator. */
   weakIdentity: z.boolean().default(false),
+  /** Diagonal in inches, from EDID physical size. Null when not reported. */
+  physicalSizeInches: z.number().positive().nullable().default(null),
 });
 export type MonitorIdentity = z.infer<typeof MonitorIdentitySchema>;
 

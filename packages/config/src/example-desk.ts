@@ -90,6 +90,7 @@ export const EXAMPLE_MONITOR_SPECS: SimulatedMonitorSpec[] = [
     model: 'XG27AQM',
     serial: 'ASUS-XG27-0001',
     manufactureYear: 2022,
+    physicalSizeInches: 27,
     capabilities: ['input-switch', 'brightness', 'power', 'read-active-input'],
     requiresActiveInput: true,
     switchDelayMs: 1800,
@@ -130,6 +131,7 @@ export const EXAMPLE_MONITOR_SPECS: SimulatedMonitorSpec[] = [
     model: 'XG27AQM',
     serial: 'ASUS-XG27-0002',
     manufactureYear: 2022,
+    physicalSizeInches: 27,
     capabilities: ['input-switch', 'brightness', 'power', 'read-active-input'],
     requiresActiveInput: true,
     switchDelayMs: 2200,
@@ -162,6 +164,7 @@ export const EXAMPLE_MONITOR_SPECS: SimulatedMonitorSpec[] = [
     model: 'PA248QV',
     serial: 'ASUS-PA24-0003',
     manufactureYear: 2021,
+    physicalSizeInches: 24,
     // Capability-poor on purpose: input switching only, no brightness/power.
     capabilities: ['input-switch'],
     requiresActiveInput: true,
@@ -194,6 +197,7 @@ export const EXAMPLE_MONITOR_SPECS: SimulatedMonitorSpec[] = [
     model: 'PA248QV',
     serial: 'ASUS-PA24-0004',
     manufactureYear: 2021,
+    physicalSizeInches: 24,
     capabilities: ['input-switch', 'brightness', 'power', 'read-active-input'],
     requiresActiveInput: true,
     switchDelayMs: 1400,
@@ -282,7 +286,7 @@ const EXAMPLE_PRESETS: Preset[] = [
     id: 'preset:pc-all',
     detectedName: 'PC All',
     customName: null,
-    description: 'Every display on the gaming PC, keyboard and mouse follow.',
+    description: 'All displays → Gaming PC',
     icon: 'monitor',
     sortOrder: 0,
     assignments: {
@@ -302,7 +306,7 @@ const EXAMPLE_PRESETS: Preset[] = [
     id: 'preset:work',
     detectedName: 'Work',
     customName: null,
-    description: 'MacBook across the stack, gaming PC kept on the right rail.',
+    description: 'MacBook stack, PC on the right',
     icon: 'briefcase',
     sortOrder: 1,
     assignments: {
@@ -322,7 +326,7 @@ const EXAMPLE_PRESETS: Preset[] = [
     id: 'preset:gaming',
     detectedName: 'Gaming',
     customName: null,
-    description: 'Centre stack on the PC, left rail on the MacBook for chat.',
+    description: 'PC centre, MacBook on the left',
     icon: 'gamepad',
     sortOrder: 2,
     assignments: {

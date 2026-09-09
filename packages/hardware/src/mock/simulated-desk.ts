@@ -24,6 +24,8 @@ export interface SimulatedMonitorSpec {
   model: string;
   serial: string | null;
   manufactureYear: number | null;
+  /** Diagonal in inches, as a real panel reports through EDID. */
+  physicalSizeInches?: number | null;
   capabilities: MonitorCapability[];
   inputs: SimulatedMonitorInput[];
   activeInputId: string;

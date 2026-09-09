@@ -71,6 +71,7 @@ curl -XPOST http://127.0.0.1:7430/monitors/<stableId>/fault -H 'content-type: ap
 ```
 apps/controller     Fastify service. desk-store, command-service, agent-gateway, snapshot, server
 apps/web            React + Vite UI. Renders snapshots; holds no desk state of its own
+                    design/ holds the design system - read docs/design-system.md first
 apps/agent          Cross-platform agent binary for real machines
 apps/mock-desk      Dev simulator: one shared SimulatedDesk + one AgentRuntime per fake computer
 packages/domain     Entities, identity, capabilities, desired/observed, reconciliation, presets
@@ -81,6 +82,26 @@ packages/config     Config schema, JSON store, example desk seed data
 packages/agent-core  Agent runtime: transport, registration, commands, reconnect
 packages/test-utils Fixture builders, waitFor
 ```
+
+## UI work
+
+Read `docs/design-system.md` before touching `apps/web`. Two rules, and they are not negotiable:
+
+- **Never hardcode a visual value** - no hex colours, pixel radii, font sizes or durations in
+  feature code. Add a token to `apps/web/src/design/tokens.css` if nothing fits.
+- **Compose primitives** (`Panel`, `ListRow`, `Tile`, `Chip`, `StatusDot`, `Sheet`, `AppShell`) from
+  `design/index.js` rather than writing markup. The `ds-*` classes back those components; feature
+  code should not use them directly.
+
+Also specific to this product:
+
+- A monitor tile's coloured screen is an _identity_ treatment for the source machine - a
+  deterministic hue plus a platform watermark. It must never read as a screen preview: this system
+  does not touch the video path and the UI may not imply otherwise.
+- Every interactive element meets `--control-min-height` (44px). The primary client is a 5-7"
+  touchscreen.
+- Controls for things that do not exist yet are rendered disabled with the reason attached, never
+  hidden and never wired to a no-op. `QuickActions` is the worked example.
 
 ## Conventions
 

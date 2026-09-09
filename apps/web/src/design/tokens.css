@@ -1,0 +1,109 @@
+/*
+ * Design tokens — the single source of truth for the look of this app.
+ *
+ * Rules:
+ *  1. Components never hardcode a colour, radius, spacing or duration. If a
+ *     value is needed and no token fits, add a token here first.
+ *  2. Tokens are semantic (--surface-2, --tone-warn) rather than literal
+ *     (--grey-800, --orange). Retheming then means editing this file only.
+ *  3. Sized for a 5–7" touchscreen as well as a desktop browser: the control
+ *     minimum height is a real constraint, not a suggestion.
+ */
+:root {
+  /* Surfaces, darkest to lightest. */
+  --surface-page: #0a0c0f;
+  --surface-1: #12151a;
+  --surface-2: #171b21;
+  --surface-3: #1e232b;
+  --surface-inset: #0d1014;
+
+  --border-subtle: rgba(255, 255, 255, 0.07);
+  --border-strong: rgba(255, 255, 255, 0.13);
+
+  --text-primary: #e9ecf1;
+  --text-secondary: #99a2b0;
+  --text-tertiary: #6b7482;
+
+  /* Tones. Each has a foreground, a translucent fill and a border. */
+  --tone-accent: #4c9aff;
+  --tone-accent-soft: rgba(76, 154, 255, 0.14);
+  --tone-accent-border: rgba(76, 154, 255, 0.55);
+
+  --tone-ok: #3fd77a;
+  --tone-ok-soft: rgba(63, 215, 122, 0.13);
+  --tone-ok-border: rgba(63, 215, 122, 0.5);
+
+  --tone-busy: #4c9aff;
+  --tone-busy-soft: rgba(76, 154, 255, 0.13);
+  --tone-busy-border: rgba(76, 154, 255, 0.5);
+
+  --tone-warn: #f0a92c;
+  --tone-warn-soft: rgba(240, 169, 44, 0.13);
+  --tone-warn-border: rgba(240, 169, 44, 0.5);
+
+  --tone-bad: #f2564b;
+  --tone-bad-soft: rgba(242, 86, 75, 0.13);
+  --tone-bad-border: rgba(242, 86, 75, 0.5);
+
+  --tone-idle: #6b7482;
+  --tone-idle-soft: rgba(107, 116, 130, 0.13);
+  --tone-idle-border: rgba(107, 116, 130, 0.45);
+
+  /* Spacing scale. */
+  --space-1: 4px;
+  --space-2: 6px;
+  --space-3: 8px;
+  --space-4: 12px;
+  --space-5: 16px;
+  --space-6: 20px;
+  --space-7: 24px;
+  --space-8: 32px;
+  --space-9: 40px;
+
+  /* Radii. */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-pill: 999px;
+
+  /* Typography. */
+  --font-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --text-2xs: 10px;
+  --text-xs: 11px;
+  --text-sm: 13px;
+  --text-base: 15px;
+  --text-lg: 18px;
+  --text-xl: 22px;
+  --text-2xl: 28px;
+  --text-3xl: 36px;
+
+  --weight-regular: 400;
+  --weight-medium: 550;
+  --weight-bold: 680;
+
+  --tracking-label: 0.14em;
+  --tracking-brand: 0.3em;
+
+  /* Elevation. */
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-2: 0 8px 24px rgba(0, 0, 0, 0.45);
+  --shadow-screen: 0 10px 30px rgba(0, 0, 0, 0.55), 0 2px 6px rgba(0, 0, 0, 0.6);
+
+  /* Motion. Kept short: this is a control panel, not a slideshow. */
+  --duration-fast: 110ms;
+  --duration-base: 180ms;
+  --ease-out: cubic-bezier(0.22, 0.9, 0.35, 1);
+
+  /* Touch. Every interactive element must meet this. */
+  --control-min-height: 44px;
+
+  --focus-ring: 0 0 0 2px var(--surface-page), 0 0 0 4px var(--tone-accent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-fast: 0ms;
+    --duration-base: 0ms;
+  }
+}

@@ -153,31 +153,27 @@ function Use-PhysicalMonitor {
   }
 }
 
-function Get-EdidRecords {
-  $records = @()
+function Get-EdidBlocks {
+  # Raw EDID straight from the device registry key. The Node side parses it,
+  # so identity is computed by one tested implementation on every platform
+  # rather than by whatever each OS chooses to surface.
+  $blocks = @()
   try {
-    foreach ($m in (Get-CimInstance -Namespace root\wmi -ClassName WmiMonitorID -ErrorAction Stop)) {
-      $toText = {
-        param($codes)
-        if ($null -eq $codes) { return $null }
-        $chars = @($codes | Where-Object { $_ -ne 0 } | ForEach-Object { [char]$_ })
-        if ($chars.Count -eq 0) { return $null }
-        return (-join $chars)
-      }
-      $records += [pscustomobject]@{
-        instanceName      = $m.InstanceName
-        manufacturerId    = (& $toText $m.ManufacturerName)
-        friendlyName      = (& $toText $m.UserFriendlyName)
-        productCode       = (& $toText $m.ProductCodeID)
-        serial            = (& $toText $m.SerialNumberID)
-        yearOfManufacture = $m.YearOfManufacture
-      }
+    $root = 'HKLM:\SYSTEM\CurrentControlSet\Enum\DISPLAY'
+    $params = Get-ChildItem -Path $root -Recurse -Depth 2 -ErrorAction SilentlyContinue |
+      Where-Object { $_.PSChildName -eq 'Device Parameters' }
+    foreach ($entry in $params) {
+      $edid = (Get-ItemProperty -Path $entry.PSPath -Name EDID -ErrorAction SilentlyContinue).EDID
+      if ($null -eq $edid) { continue }
+      $key = $entry.Name -replace '^.*?\\Enum\\', '' -replace '\\Device Parameters$', ''
+      $hex = -join ($edid | ForEach-Object { $_.ToString('x2') })
+      $blocks += [pscustomobject]@{ key = $key; edidHex = $hex }
     }
   } catch {
-    # WMI can be unavailable in restricted sessions. Identity then falls back to
-    # the DDC-reported model, which the Node side flags as a weak identity.
+    # Without EDID the Node side falls back to the DDC-reported model and marks
+    # the identity weak, which is better than failing discovery outright.
   }
-  return $records
+  return $blocks
 }
 
 function Find-Display {
@@ -201,7 +197,7 @@ function Read-Vcp {
 }
 
 function Invoke-List {
-  $edid = Get-EdidRecords
+  $edid = Get-EdidBlocks
   $monitors = @()
   foreach ($d in (Get-Displays)) {
     $caps = $null
@@ -225,12 +221,11 @@ function Invoke-List {
     }
 
     $monitors += [pscustomobject]@{
-      deviceId     = $d.DeviceId
-      adapter      = $d.Adapter
-      description  = $d.DeviceString
-      isPrimary    = $d.IsPrimary
-      capabilities = $caps
-      capabilitiesError = $capsError
+      deviceId              = $d.DeviceId
+      description           = $d.DeviceString
+      capabilities          = $caps
+      capabilitiesError     = $capsError
+      fallbackDisambiguator = $d.Adapter
     }
   }
   return [pscustomobject]@{ monitors = @($monitors); edid = @($edid) }

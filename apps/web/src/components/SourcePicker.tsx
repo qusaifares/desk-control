@@ -1,84 +1,45 @@
 import type { DeskSnapshot, Monitor } from '@desk-control/domain';
+import { Chip, ListRow, Sheet, StatusDot, Stack } from '../design/index.js';
+import { CONNECTOR_COLORS } from '../lib/appearance.js';
 import { agentForComputer, computerById, displayNameOf, sourcesForMonitor } from '../lib/desk.js';
+import { platformIcon } from './icons.js';
 
 interface Props {
   snapshot: DeskSnapshot;
   monitor: Monitor;
   onPick: (computerId: string) => void;
   onClose: () => void;
-  error: string | null;
 }
 
 /**
- * Only computers physically wired to this monitor are offered. The list comes
+ * Only computers physically wired to this monitor are offered — the list comes
  * from discovered wiring, not from a hardcoded desk.
  */
-export function SourcePicker({ snapshot, monitor, onPick, onClose, error }: Props) {
+export function SourcePicker({ snapshot, monitor, onPick, onClose }: Props) {
   const sources = sourcesForMonitor(snapshot, monitor);
   const resolution = snapshot.resolutions.monitors[monitor.id];
   const observedId = resolution?.observedSourceComputerId ?? null;
   const desiredId = resolution?.desiredSourceComputerId ?? null;
 
+  const subtitle = [
+    `${monitor.identity.manufacturerId} ${monitor.identity.model}`,
+    monitor.identity.serial,
+    monitor.identity.physicalSizeInches
+      ? `${Math.round(monitor.identity.physicalSizeInches)}"`
+      : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+
   return (
-    <div className="sheet-backdrop" onClick={onClose} role="presentation">
-      <div
-        className="sheet"
-        role="dialog"
-        aria-label={`Choose a source for ${displayNameOf(monitor)}`}
-        onClick={(event) => event.stopPropagation()}
-      >
-        <header className="sheet-header">
-          <div>
-            <h2>{displayNameOf(monitor)}</h2>
-            <p className="sheet-subtitle">
-              {monitor.identity.manufacturerId} {monitor.identity.model}
-              {monitor.identity.serial ? ` · ${monitor.identity.serial}` : ''}
-            </p>
-          </div>
-          <button type="button" className="ghost-button" onClick={onClose}>
-            Close
-          </button>
-        </header>
-
-        {error ? <p className="sheet-error">{error}</p> : null}
-
-        <ul className="source-list">
-          {sources.map((computer) => {
-            const input = monitor.inputs.find((i) => i.connectedComputerId === computer.id);
-            const agent = agentForComputer(snapshot, computer.id);
-            const isLive = computer.id === observedId;
-            const isRequested = computer.id === desiredId && !isLive;
-            return (
-              <li key={computer.id}>
-                <button
-                  type="button"
-                  className={`source-option${isLive ? ' is-live' : ''}`}
-                  onClick={() => onPick(computer.id)}
-                >
-                  <span className="source-name">{displayNameOf(computer)}</span>
-                  <span className="source-meta">
-                    {input ? `${input.connector} · ${displayNameOf(input)}` : 'unwired'}
-                    {input?.maxMode
-                      ? ` · ${input.maxMode.width}×${input.maxMode.height} @ ${input.maxMode.refreshHz}Hz${input.maxMode.vrr ? ' VRR' : ''}`
-                      : ''}
-                  </span>
-                  <span className="source-flags">
-                    {isLive ? <span className="chip chip-in-sync">Live</span> : null}
-                    {isRequested ? <span className="chip chip-switching">Requested</span> : null}
-                    <span
-                      className={`dot dot-${agent?.connectivity.state ?? computer.connectivity.state}`}
-                    />
-                  </span>
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-
-        <footer className="sheet-footer">
-          <p>
-            Capabilities: {monitor.capabilities.join(', ') || 'none reported'}
-            {' · '}
+    <Sheet
+      title={displayNameOf(monitor)}
+      subtitle={subtitle}
+      onClose={onClose}
+      footer={
+        <>
+          <span>Capabilities: {monitor.capabilities.join(', ') || 'none reported'}</span>
+          <span>
             Control paths:{' '}
             {monitor.controlPaths
               .map((path) => {
@@ -86,9 +47,58 @@ export function SourcePicker({ snapshot, monitor, onPick, onClose, error }: Prop
                 return computer ? displayNameOf(computer) : path.computerId;
               })
               .join(', ') || 'none'}
-          </p>
-        </footer>
-      </div>
-    </div>
+          </span>
+        </>
+      }
+    >
+      <Stack>
+        {sources.length === 0 ? (
+          <ListRow title="Nothing is wired to this monitor yet" hideChevron />
+        ) : null}
+
+        {sources.map((computer) => {
+          const input = monitor.inputs.find(
+            (candidate) => candidate.connectedComputerId === computer.id,
+          );
+          const agent = agentForComputer(snapshot, computer.id);
+          const state = agent?.connectivity.state ?? computer.connectivity.state;
+          const isLive = computer.id === observedId;
+          const isRequested = !isLive && computer.id === desiredId;
+
+          const detail = [
+            input ? `${input.connector} · ${displayNameOf(input)}` : 'not wired',
+            input?.maxMode
+              ? `${input.maxMode.width}×${input.maxMode.height} @ ${input.maxMode.refreshHz}Hz${
+                  input.maxMode.vrr ? ' VRR' : ''
+                }`
+              : null,
+          ]
+            .filter(Boolean)
+            .join(' · ');
+
+          return (
+            <ListRow
+              key={computer.id}
+              icon={platformIcon(computer.platform)}
+              title={displayNameOf(computer)}
+              subtitle={detail}
+              selected={isLive}
+              onClick={() => onPick(computer.id)}
+              trailing={
+                <>
+                  {isLive ? <Chip tone="ok">Live</Chip> : null}
+                  {isRequested ? <Chip tone="busy">Requested</Chip> : null}
+                  {input ? <StatusDot color={CONNECTOR_COLORS[input.connector]} /> : null}
+                  <StatusDot
+                    tone={state === 'online' ? 'ok' : state === 'offline' ? 'bad' : 'idle'}
+                    label={`Agent ${state}`}
+                  />
+                </>
+              }
+            />
+          );
+        })}
+      </Stack>
+    </Sheet>
   );
 }

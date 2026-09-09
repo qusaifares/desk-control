@@ -43,6 +43,23 @@ export function subscribeToDesk(handlers: {
   let socket: WebSocket | null = null;
   let retryTimer: number | undefined;
   let closed = false;
+  let receivedLive = false;
+
+  /*
+   * Paint from a plain HTTP read first, then let the socket take over.
+   *
+   * The desk is readable the moment the page loads instead of after a
+   * WebSocket handshake, and a browser that cannot hold a socket open at all
+   * still shows the desk rather than a spinner.
+   */
+  void fetch('/api/desk')
+    .then((response) => (response.ok ? (response.json() as Promise<DeskSnapshot>) : null))
+    .then((snapshot) => {
+      if (snapshot && !closed && !receivedLive) handlers.onSnapshot(snapshot);
+    })
+    .catch(() => {
+      // The socket is the real path; a failed prefetch changes nothing.
+    });
 
   const connect = () => {
     if (closed) return;
@@ -57,7 +74,10 @@ export function subscribeToDesk(handlers: {
           type: string;
           snapshot?: DeskSnapshot;
         };
-        if (message.type === 'snapshot' && message.snapshot) handlers.onSnapshot(message.snapshot);
+        if (message.type === 'snapshot' && message.snapshot) {
+          receivedLive = true;
+          handlers.onSnapshot(message.snapshot);
+        }
       } catch {
         // Ignore frames we cannot parse; the next snapshot supersedes them.
       }
