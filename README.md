@@ -130,6 +130,7 @@ docs/
 - [docs/development.md](docs/development.md) — environment, workflows, simulator control API
 - [docs/raspberry-pi.md](docs/raspberry-pi.md) — running the panel on a Pi: install, kiosk, display
 - [docs/design-system.md](docs/design-system.md) — tokens, primitives, and how to build a new screen
+- [docs/usb-switch-wiring.md](docs/usb-switch-wiring.md) — wiring a KM switch to the Pi's GPIO
 - [docs/glossary.md](docs/glossary.md) — DDC, VCP, EDID, GPIO and the rest, in plain terms
 - [CLAUDE.md](CLAUDE.md) — invariants and conventions for future work in this repo
 

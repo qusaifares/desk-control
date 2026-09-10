@@ -124,11 +124,12 @@ state. It would otherwise move your monitors underneath you every time the Pi re
 
 ## The USB switch
 
-Not wired up yet. A KM switch of this class has no software interface — control is the front button
-and the wired remote — so the Pi will drive it by closing the remote's contacts through a GPIO pin
-and an optocoupler, which is what `driverBinding: 'controller'` in the desk config means.
+See [usb-switch-wiring.md](usb-switch-wiring.md) for the full build.
 
-The open question is whether the remote selects ports directly or cycles through them. Cycling gives
-no way to know which port is live, and this system does not guess: the answer is to have each agent
-report whether the shared keyboard and mouse are currently enumerated on its machine, so observed
-ownership comes from the computers rather than from a counter we maintain.
+In short: the switch has no software interface, so the Pi presses its remote's buttons electrically
+through an optocoupler — which is what `driverBinding: 'controller'` means. With a four-button remote
+each port has its own pin, so there is no position to track and nothing to desync.
+
+The switch still cannot report which port it is on, so give each peripheral its USB id and let the
+agents say which machine can see it. That turns ownership from an assumption about a button press
+into a reading of the actual outcome.
