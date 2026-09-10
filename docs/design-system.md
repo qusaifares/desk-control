@@ -125,8 +125,12 @@ Monitors are renamed in Edit desk; computers in the system sheet. Both call the 
 
 ## Target viewports
 
-The panel this is built for is **440 × 1920** — a tall, narrow strip, not a landscape tablet. Half
-that width again (**220 × 1920**) is the case where it shares the panel with something else.
+The panel this is built for is **1920 × 440** — a wide, short strip, not a tablet. Half of it again
+(**960 × 440**) is the case where it shares the screen with something else.
+
+Height is the scarce resource on both. That inverts the usual responsive instinct: the answer to a
+cramped layout here is almost never "stack it", because stacking trades the resource there is least
+of. Columns are what make it fit.
 
 Check both after any layout change:
 
@@ -134,31 +138,41 @@ Check both after any layout change:
 pnpm dev
 ```
 
-then open <http://127.0.0.1:5173/viewport-test.html>, which renders the app in iframes at both sizes
-side by side.
+then open <http://127.0.0.1:5173/viewport-test.html>, which renders the app in iframes at both sizes.
 
-**Do not test narrow layouts by resizing the browser window on Windows.** Chrome clamps a window to
-a ~500px minimum width, so a 440px screenshot lays out at 500 and crops the result — it looks exactly
-like a horizontal overflow bug that is not there. An iframe has its own layout viewport and reports
-honestly at any width, which is why the harness exists.
+**Do not test by resizing the browser window on Windows.** Chrome clamps a window to a ~500px
+minimum width, so a narrow screenshot lays out wider and crops the result — it looks exactly like an
+overflow bug that is not there. An iframe has its own layout viewport and reports honestly at any
+size, which is why the harness exists.
 
-Component tests run in jsdom, which does no layout, so they cannot catch any of this. Narrow-layout
-regressions are found by looking.
+Component tests run in jsdom, which does no layout, so they cannot catch any of this. Layout
+regressions are found by looking — and, when looking is ambiguous, by measuring: the harness is
+same-origin, so a throwaway script can read `scrollHeight`, computed `grid-template-columns` and
+element widths straight out of the iframe. That is how every fix in this area was actually diagnosed.
 
-### How the layout degrades
+### How the layout adapts
 
-| Width    | Behaviour                                                            |
-| -------- | -------------------------------------------------------------------- |
-| > 1180px | Three columns: presets, desk map, peripherals + quick actions        |
-| ≤ 1180px | Single column, desk map first                                        |
-| ≤ 520px  | Content packs to the top, header wraps, tiles shrink, panels tighten |
-| ≤ 300px  | Row icons drop, tiles go single-column, the tagline goes             |
+| Condition                          | Behaviour                                                                                                                                   |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| Default                            | Three columns: presets, desk map, peripherals + quick actions                                                                               |
+| ≤ 1240px wide                      | Rails narrow to 240/270 rather than collapsing                                                                                              |
+| ≤ 900px wide **and** ≥ 600px tall  | Single column, desk map first                                                                                                               |
+| ≤ 560px tall                       | Chrome shrinks to hand height to the map; the shell is fixed to the viewport and rails scroll internally rather than pushing the footer off |
+| ≥ 1500px wide **and** ≤ 560px tall | The right rail spreads into two columns, so keyboard routing and quick actions sit side by side                                             |
+| ≤ 520px wide                       | Content packs to the top, header wraps, panels tighten                                                                                      |
+| ≤ 300px wide                       | Row icons drop, tiles go single-column, the tagline goes                                                                                    |
 
-Monitor tiles degrade by **their own size**, not the window's, via container queries — a portrait
-rail and a landscape panel on the same map are wildly different widths. Detail is shed in order of
-usefulness: physical size first, then the monitor's name (its position on the map already implies
-it), then the connector. What survives longest is which machine is on the panel, because that is the
-only reason to look.
+Monitor tiles degrade by **their own size**, not the window's, via container queries on both axes — a
+portrait rail and a landscape panel on one map are wildly different shapes, and a short wide tile
+runs out of vertical room long before horizontal. Detail sheds in order of usefulness: physical size,
+then the monitor name (its position on the map already implies it), then the connector. What survives
+longest is which machine is on the panel, because that is the only reason to look.
+
+### One ordering trap
+
+Short-viewport overrides live at the **end** of `system.css`. They are plain class selectors at the
+same specificity as the component rules they adjust, so if they appear earlier in the file the
+component rules simply win and the whole block silently does nothing.
 
 ## Testing
 

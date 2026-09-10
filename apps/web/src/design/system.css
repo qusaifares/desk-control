@@ -54,7 +54,23 @@
   min-height: 0;
 }
 
-@media (max-width: 1180px) {
+/*
+ * Narrow the rails before giving up columns entirely. On a short panel the
+ * columns are what make the layout fit at all - stacking them would turn a
+ * 440px-tall screen into a scrolling list.
+ */
+@media (max-width: 1240px) {
+  .ds-shell-body {
+    grid-template-columns: 240px minmax(0, 1fr) 270px;
+    gap: var(--space-4);
+  }
+}
+
+/*
+ * Stack only when there is vertical room to scroll into. A short, wide panel
+ * keeps its columns however narrow it gets.
+ */
+@media (max-width: 900px) and (min-height: 600px) {
   .ds-shell-body {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -683,4 +699,95 @@ button.ds-tile:active:not(:disabled) {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
+}
+
+/*
+ * Short and wide - the strip panel this is built for.
+ *
+ * Height is the scarce resource, so the chrome gives ground first: the header
+ * collapses to one compact line and the footer to a single row, handing the
+ * difference to the desk map. Nothing scrolls; everything is meant to be
+ * visible at a glance from across a desk.
+ */
+@media (max-height: 560px) {
+  .ds-shell {
+    /* Fit the panel exactly. Nothing about a glanceable control surface should
+       require scrolling the page. */
+    height: 100vh;
+    min-height: 0;
+    overflow: hidden;
+    gap: var(--space-4);
+    padding: var(--space-4) var(--space-5);
+  }
+
+  .ds-shell-body {
+    gap: var(--space-4);
+    align-content: stretch;
+    min-height: 0;
+  }
+
+  /* If a rail still cannot fit, it scrolls itself rather than pushing the map
+     and the footer off the panel. */
+  .ds-rail {
+    min-height: 0;
+    overflow-y: auto;
+    scrollbar-width: thin;
+  }
+
+  /* :not(.ds-panel-plain) or this hands padding back to panels that opted out
+     of it, which is where the extra vertical rhythm was coming from. */
+  .ds-panel:not(.ds-panel-plain) {
+    padding: var(--space-4);
+  }
+
+  .ds-panel {
+    gap: var(--space-3);
+  }
+
+  .ds-row {
+    min-height: 40px;
+    padding: var(--space-3);
+  }
+
+  /* 120px just misses two columns once panel padding is taken out. */
+  .ds-tile-grid {
+    grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
+    gap: var(--space-3);
+  }
+
+  .ds-row-icon {
+    width: 30px;
+    height: 30px;
+  }
+
+  .ds-tile {
+    min-height: 68px;
+    padding: var(--space-3);
+  }
+
+  .ds-rail {
+    gap: var(--space-4);
+  }
+}
+
+/*
+ * Wide and short: the full strip.
+ *
+ * There is far more width than the three-column layout needs and far too little
+ * height, so the right rail spreads sideways into two columns instead of
+ * stacking. Keyboard routing and quick actions then sit next to each other and
+ * the whole panel fits without scrolling anything.
+ */
+@media (min-width: 1500px) and (max-height: 560px) {
+  .ds-shell-body {
+    grid-template-columns: 280px minmax(0, 1fr) 560px;
+  }
+
+  .ds-rail:last-child {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-4);
+    align-content: start;
+    overflow: visible;
+  }
 }

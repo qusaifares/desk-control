@@ -102,10 +102,14 @@ Also specific to this product:
   deterministic hue plus a platform watermark. It must never read as a screen preview: this system
   does not touch the video path and the UI may not imply otherwise.
 - Every interactive element meets `--control-min-height` (44px).
-- The target panel is **440x1920** (and 220 wide when split), not a landscape tablet. Check both at
-  `/viewport-test.html` after layout changes. Do not resize the browser window to test narrow
-  widths on Windows: Chrome clamps to a ~500px minimum and silently crops, which looks exactly like
-  an overflow bug that is not there.
+- The target panel is **1920x440** - a wide, short strip - and **960x440** when split. Height is the
+  scarce resource, so the answer to a cramped layout is rarely "stack it": stacking spends the thing
+  there is least of. Check both at `/viewport-test.html` after layout changes.
+- Do not resize the browser window to test narrow widths on Windows: Chrome clamps to a ~500px
+  minimum and silently crops, which looks exactly like an overflow bug that is not there. The
+  harness is same-origin, so measure inside the iframe rather than guessing from a screenshot.
+- Short-viewport overrides live at the END of `system.css`. Same specificity as the component rules
+  they adjust, so earlier in the file means they silently do nothing.
 - Monitor tiles degrade by their own size via container queries, not by viewport width.
 - Controls for things that do not exist yet are rendered disabled with the reason attached, never
   hidden and never wired to a no-op. `QuickActions` is the worked example.

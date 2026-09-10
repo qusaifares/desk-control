@@ -68,9 +68,42 @@
   margin: auto;
 }
 
-@media (max-width: 1180px) {
+@media (max-width: 900px) and (min-height: 600px) {
   .desk-map {
     --map-available-height: 52vh;
+  }
+}
+
+/* Short panel: the chrome is trimmed, so the map can claim most of the height. */
+@media (max-height: 560px) {
+  .desk-map {
+    --map-available-height: calc(100vh - 168px);
+  }
+
+  .desk-header {
+    align-items: center;
+    padding-bottom: var(--space-3);
+  }
+
+  .desk-brand-title {
+    font-size: var(--text-xl);
+  }
+
+  .desk-brand-sub {
+    display: none;
+  }
+
+  .desk-clock-time {
+    font-size: var(--text-lg);
+  }
+
+  .desk-clock-date {
+    font-size: var(--text-xs);
+  }
+
+  .desk-footer {
+    padding-top: var(--space-3);
+    font-size: var(--text-xs);
   }
 }
 

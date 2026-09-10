@@ -127,6 +127,12 @@ curl -XPOST http://127.0.0.1:7420/api/desk/computers -H 'content-type: applicati
 curl -XPOST http://127.0.0.1:7420/api/desk/wiring -H 'content-type: application/json' -d '{"monitorId":"<id>","inputId":"input-0x11","computerId":"computer:manual:playstation-5"}'
 ```
 
+## Checking the panel layout
+
+The UI targets a 1920x440 strip, and 960x440 when split. After any layout change, open
+<http://127.0.0.1:5173/viewport-test.html> with `pnpm dev` running - it renders the app in iframes
+at both sizes. See [design-system.md](design-system.md) for why an iframe and not a resized window.
+
 ## Stopping the dev environment
 
 ```bash
