@@ -53,7 +53,7 @@ describe('persisting user edits', () => {
     const onConfigChange = vi.fn();
     store.subscribeConfig(onConfigChange);
 
-    store.setCustomName('monitor', MONITOR, 'Right Rail');
+    store.setOverride(MONITOR, { customName: 'Right Rail' });
     store.setPlacement(MONITOR, {
       x: 2,
       y: 1,
@@ -194,5 +194,61 @@ describe('wiring overrides', () => {
     const store = storeWithOneAgent();
     const declared = store.declareComputer('Media box', 'unknown');
     expect(store.setWiringOverride(MONITOR, 'input-0xff', declared.id)).toBe(false);
+  });
+});
+
+describe('presentation overrides', () => {
+  it('applies a name to the live entity and persists it', () => {
+    const store = storeWithOneAgent();
+    expect(store.setOverride(MONITOR, { customName: 'Right Rail' })).toBe(true);
+
+    expect(store.monitors.get(MONITOR)?.customName).toBe('Right Rail');
+    // The detected name is kept, not replaced.
+    expect(store.monitors.get(MONITOR)?.detectedName).toBe('AUS PA279CV');
+    expect(store.config.overrides[MONITOR]?.customName).toBe('Right Rail');
+  });
+
+  it('leaves untouched fields alone when patching one of them', () => {
+    const store = storeWithOneAgent();
+    store.setOverride('computer:pc', { customName: 'Battlestation' });
+    store.setOverride('computer:pc', { colorway: 'ember' });
+
+    expect(store.config.overrides['computer:pc']).toEqual({
+      customName: 'Battlestation',
+      icon: null,
+      colorway: 'ember',
+    });
+    expect(store.computers.get('computer:pc')?.appearance.colorway).toBe('ember');
+  });
+
+  it('drops the record entirely once every field is cleared', () => {
+    const store = storeWithOneAgent();
+    store.setOverride('computer:pc', { customName: 'Battlestation', icon: 'gamepad' });
+    store.setOverride('computer:pc', { customName: null, icon: null });
+
+    // No empty husks left behind in the config.
+    expect(store.config.overrides['computer:pc']).toBeUndefined();
+    expect(store.computers.get('computer:pc')?.customName).toBeNull();
+  });
+
+  it('resolves the composite key used for a monitor input', () => {
+    const store = storeWithOneAgent();
+    expect(store.setOverride(`${MONITOR}:input-0x11`, { customName: 'Console port' })).toBe(true);
+    expect(store.monitors.get(MONITOR)?.inputs.find((i) => i.id === 'input-0x11')?.customName).toBe(
+      'Console port',
+    );
+  });
+
+  it('refuses an entity the desk has never heard of', () => {
+    const store = storeWithOneAgent();
+    expect(store.setOverride('computer:ghost', { customName: 'Nope' })).toBe(false);
+    expect(store.setOverride(`${MONITOR}:input-0xff`, { customName: 'Nope' })).toBe(false);
+  });
+
+  it('survives a re-discovery, which reports only detected names', () => {
+    const store = storeWithOneAgent();
+    store.setOverride(MONITOR, { customName: 'Right Rail' });
+    store.applyMonitorReports('agent:pc', 'computer:pc', [report()]);
+    expect(store.monitors.get(MONITOR)?.customName).toBe('Right Rail');
   });
 });

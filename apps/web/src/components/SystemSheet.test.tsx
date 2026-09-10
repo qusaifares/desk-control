@@ -25,7 +25,12 @@ function withAgent(snapshot: DeskSnapshot, providerKind: string): DeskSnapshot {
 }
 
 function renderSheet(snapshot: DeskSnapshot = makeSnapshot({ observedId: 'computer:pc' })) {
-  const props = { snapshot, onRenameComputer: vi.fn(), onClose: vi.fn() };
+  const props = {
+    snapshot,
+    onRenameComputer: vi.fn(),
+    onSetAppearance: vi.fn(),
+    onClose: vi.fn(),
+  };
   render(<SystemSheet {...props} />);
   return props;
 }
@@ -62,6 +67,24 @@ describe('SystemSheet', () => {
     fireEvent.click(screen.getByText('Gaming PC'));
     expect(screen.getByText('computer:pc')).toBeDefined();
     expect(screen.getByText(/reported by its agent as/i)).toBeDefined();
+  });
+
+  it('sets a colourway, and clears it by tapping the same swatch again', () => {
+    const props = renderSheet();
+    fireEvent.click(screen.getByText('Gaming PC'));
+
+    fireEvent.click(screen.getByLabelText('Ember'));
+    expect(props.onSetAppearance).toHaveBeenCalledWith('computer:pc', { colorway: 'ember' });
+  });
+
+  it('sets an icon independently of the name', () => {
+    const props = renderSheet();
+    fireEvent.click(screen.getByText('Gaming PC'));
+
+    fireEvent.click(screen.getByLabelText('gamepad'));
+    expect(props.onSetAppearance).toHaveBeenCalledWith('computer:pc', { icon: 'gamepad' });
+    // Appearance and naming are separate overrides; one must not imply the other.
+    expect(props.onRenameComputer).not.toHaveBeenCalled();
   });
 
   it('marks a simulated agent so mock hardware cannot pass for real', () => {

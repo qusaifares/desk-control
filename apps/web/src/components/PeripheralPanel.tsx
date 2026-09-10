@@ -2,7 +2,7 @@ import type { DeskSnapshot, Peripheral } from '@desk-control/domain';
 import { Chip, Panel, StatusDot, Tile, TileGrid } from '../design/index.js';
 import { STATUS_TONE } from '../lib/appearance.js';
 import { computerById, displayNameOf, STATUS_LABELS } from '../lib/desk.js';
-import { platformIcon } from './icons.js';
+import { computerIcon } from './icons.js';
 
 interface Props {
   snapshot: DeskSnapshot;
@@ -90,7 +90,7 @@ export function PeripheralPanel({ snapshot, onSetOwner }: Props) {
                 return (
                   <Tile
                     key={computer.id}
-                    icon={platformIcon(computer.platform, 22)}
+                    icon={computerIcon(computer, 22)}
                     label={displayNameOf(computer)}
                     selected={isOwner}
                     marker={

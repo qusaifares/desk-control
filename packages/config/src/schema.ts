@@ -15,29 +15,48 @@ import { z } from 'zod';
  * persisted here - they are re-discovered from agents on every boot, so a
  * swapped monitor or a re-cabled desk cannot leave stale truth behind.
  */
-export const CustomNamesSchema = z.object({
-  computers: z.record(z.string(), z.string()).default({}),
-  monitors: z.record(z.string(), z.string()).default({}),
-  monitorInputs: z.record(z.string(), z.string()).default({}),
-  peripherals: z.record(z.string(), z.string()).default({}),
+/**
+ * User overrides layered over a discovered entity, keyed by its stable id.
+ *
+ * One record per entity rather than a parallel map per field: adding a field
+ * used to mean adding a whole top-level structure and threading it through the
+ * schema, the store, the snapshot and the API. Now it is one property.
+ *
+ * Scope is deliberately narrow - this is *presentation only*. Being wrong here
+ * costs a wrong label; it can never send a command to the wrong input. Facts
+ * the user asserts about hardware (`wiringOverrides`) and spatial configuration
+ * (`layout.placements`) stay separate, because they drive behaviour and are
+ * shaped differently.
+ */
+export const EntityOverrideSchema = z.object({
+  customName: z.string().min(1).max(120).nullable().default(null),
+  /** Icon hint, e.g. "gamepad". Free-form; the UI falls back if unknown. */
+  icon: z.string().max(40).nullable().default(null),
+  /** Named colourway, e.g. "ember". Never a raw colour value. */
+  colorway: z.string().max(40).nullable().default(null),
 });
-export type CustomNames = z.infer<typeof CustomNamesSchema>;
+export type EntityOverride = z.infer<typeof EntityOverrideSchema>;
+
+export const emptyOverride = (): EntityOverride => ({
+  customName: null,
+  icon: null,
+  colorway: null,
+});
 
 export const DeskConfigSchema = z.object({
-  /** Bumped when a migration is required; see migrate(). */
-  configVersion: z.literal(1),
+  /** Bumped when the shape changes; see migrateDeskConfig(). */
+  configVersion: z.literal(2),
   controller: z.object({
     id: z.string().min(1),
     name: z.string().min(1),
   }),
   layout: DeskLayoutSchema,
   presets: z.array(PresetSchema).default([]),
-  customNames: CustomNamesSchema.default({
-    computers: {},
-    monitors: {},
-    monitorInputs: {},
-    peripherals: {},
-  }),
+  /**
+   * entityId -> override. Monitor inputs use `<monitorId>:<inputId>`; every
+   * other id is already namespaced and unambiguous on its own.
+   */
+  overrides: z.record(z.string(), EntityOverrideSchema).default({}),
   peripherals: z.array(PeripheralSchema).default([]),
   peripheralSwitches: z.array(PeripheralSwitchSchema).default([]),
   /**

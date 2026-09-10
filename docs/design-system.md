@@ -123,6 +123,43 @@ presentation only.
 Monitors are renamed in Edit desk; computers in the system sheet. Both call the same
 `/api/desk/name` endpoint.
 
+## Target viewports
+
+The panel this is built for is **440 × 1920** — a tall, narrow strip, not a landscape tablet. Half
+that width again (**220 × 1920**) is the case where it shares the panel with something else.
+
+Check both after any layout change:
+
+```bash
+pnpm dev
+```
+
+then open <http://127.0.0.1:5173/viewport-test.html>, which renders the app in iframes at both sizes
+side by side.
+
+**Do not test narrow layouts by resizing the browser window on Windows.** Chrome clamps a window to
+a ~500px minimum width, so a 440px screenshot lays out at 500 and crops the result — it looks exactly
+like a horizontal overflow bug that is not there. An iframe has its own layout viewport and reports
+honestly at any width, which is why the harness exists.
+
+Component tests run in jsdom, which does no layout, so they cannot catch any of this. Narrow-layout
+regressions are found by looking.
+
+### How the layout degrades
+
+| Width    | Behaviour                                                            |
+| -------- | -------------------------------------------------------------------- |
+| > 1180px | Three columns: presets, desk map, peripherals + quick actions        |
+| ≤ 1180px | Single column, desk map first                                        |
+| ≤ 520px  | Content packs to the top, header wraps, tiles shrink, panels tighten |
+| ≤ 300px  | Row icons drop, tiles go single-column, the tagline goes             |
+
+Monitor tiles degrade by **their own size**, not the window's, via container queries — a portrait
+rail and a landscape panel on the same map are wildly different widths. Detail is shed in order of
+usefulness: physical size first, then the monitor's name (its position on the map already implies
+it), then the connector. What survives longest is which machine is on the panel, because that is the
+only reason to look.
+
 ## Testing
 
 `src/test/fixtures.ts` builds a valid `DeskSnapshot` so a test states only what it cares about.

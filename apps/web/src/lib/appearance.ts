@@ -21,6 +21,34 @@ import type { Connector, Platform, SyncStatus } from '@desk-control/domain';
  */
 const MACHINE_HUES = [212, 258, 288, 322, 190, 168];
 
+/**
+ * Named colourways a user can pick.
+ *
+ * A curated set rather than a free colour picker: a hue slider on a touchscreen
+ * invites illegible choices, and these are all checked against the dark ground.
+ *
+ * `ember` is the only one in the red band, and it is deliberately opt-in - red
+ * and amber carry status meaning elsewhere in the UI, so they are never
+ * assigned automatically. Choosing it is a decision; being handed it would be a
+ * collision.
+ */
+export const COLORWAYS: Array<{ id: string; label: string; hue: number; saturation?: number }> = [
+  { id: 'ember', label: 'Ember', hue: 352 },
+  { id: 'cobalt', label: 'Cobalt', hue: 212 },
+  { id: 'indigo', label: 'Indigo', hue: 258 },
+  { id: 'violet', label: 'Violet', hue: 288 },
+  { id: 'magenta', label: 'Magenta', hue: 322 },
+  { id: 'cyan', label: 'Cyan', hue: 190 },
+  { id: 'teal', label: 'Teal', hue: 168 },
+  { id: 'slate', label: 'Slate', hue: 215, saturation: 18 },
+];
+
+export function colorwaySwatch(id: string): string {
+  const colorway = COLORWAYS.find((candidate) => candidate.id === id);
+  if (!colorway) return 'hsl(215 18% 40%)';
+  return `hsl(${colorway.hue} ${colorway.saturation ?? 62}% 42%)`;
+}
+
 function hashOf(seed: string): number {
   let hash = 2166136261;
   for (let index = 0; index < seed.length; index += 1) {
@@ -37,18 +65,25 @@ function machineHue(computerId: string): number {
 const NEUTRAL_SCREEN = 'linear-gradient(155deg, #1b2129 0%, #2f3945 48%, #161b21 100%)';
 
 export function screenStyle(
-  computer: { id: string; platform: Platform } | undefined,
+  computer:
+    { id: string; platform: Platform; appearance?: { colorway: string | null } } | undefined,
   dimmed: boolean,
 ): React.CSSProperties {
   if (!computer) {
     return { background: NEUTRAL_SCREEN, filter: 'saturate(0.2) brightness(0.7)' };
   }
-  const hue = machineHue(computer.id);
+
+  // A chosen colourway wins; otherwise fall back to the deterministic default.
+  const chosen = computer.appearance?.colorway
+    ? COLORWAYS.find((candidate) => candidate.id === computer.appearance?.colorway)
+    : undefined;
+  const hue = chosen?.hue ?? machineHue(computer.id);
+  const saturation = chosen?.saturation ?? 62;
   return {
     background: `linear-gradient(155deg,
-      hsl(${hue} 62% 22%) 0%,
-      hsl(${hue + 12} 68% 42%) 46%,
-      hsl(${hue - 14} 60% 16%) 100%)`,
+      hsl(${hue} ${saturation}% 22%) 0%,
+      hsl(${hue + 12} ${saturation + 6}% 42%) 46%,
+      hsl(${hue - 14} ${saturation - 2}% 16%) 100%)`,
     filter: dimmed ? 'saturate(0.4) brightness(0.6)' : undefined,
   };
 }

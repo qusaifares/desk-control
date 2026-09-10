@@ -76,6 +76,7 @@ export function makeSnapshot(options: {
         agentId: null,
         connectivity: { state: 'online', lastSeenAt: null },
         metadata: {},
+        appearance: { icon: null, colorway: null },
       },
       {
         id: 'computer:mac',
@@ -87,6 +88,7 @@ export function makeSnapshot(options: {
         agentId: null,
         connectivity: { state: 'online', lastSeenAt: null },
         metadata: {},
+        appearance: { icon: null, colorway: null },
       },
     ],
     agents: [],

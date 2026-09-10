@@ -10,6 +10,7 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: var(--space-5);
+  min-width: 0;
   padding-bottom: var(--space-5);
   border-bottom: 1px solid var(--border-subtle);
 }
@@ -70,6 +71,45 @@
 @media (max-width: 1180px) {
   .desk-map {
     --map-available-height: 52vh;
+  }
+}
+
+@media (max-width: 520px) {
+  .desk-header {
+    flex-wrap: wrap;
+    gap: var(--space-3);
+    padding-bottom: var(--space-4);
+  }
+
+  .desk-brand-title {
+    font-size: var(--text-xl);
+  }
+
+  .desk-clock-time {
+    font-size: var(--text-lg);
+  }
+
+  .desk-header-right {
+    gap: var(--space-3);
+  }
+
+  .desk-footer {
+    padding-top: var(--space-4);
+    font-size: var(--text-xs);
+  }
+}
+
+@media (max-width: 300px) {
+  /* The tagline is the first thing to go: it is decoration, and the desk is
+     not. */
+  .desk-brand-sub {
+    display: none;
+  }
+
+  .desk-footer {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-2);
   }
 }
 
@@ -182,6 +222,7 @@ button.monitor:active .monitor-frame {
   flex-direction: column;
   gap: 1px;
   text-align: left;
+  min-width: 0;
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.65);
 }
 
@@ -190,6 +231,9 @@ button.monitor:active .monitor-frame {
   font-weight: var(--weight-bold);
   line-height: 1.1;
   color: #fff;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .monitor-format {
@@ -202,7 +246,74 @@ button.monitor:active .monitor-frame {
   flex-direction: column;
   align-items: center;
   gap: clamp(2px, 1.5cqmin, 6px);
+  min-width: 0;
   text-shadow: 0 1px 4px rgba(0, 0, 0, 0.7);
+}
+
+/*
+ * Tile-sized, not viewport-sized.
+ *
+ * On a 220px-wide panel a four-monitor desk gives each tile about 45px. What
+ * matters at that size is which machine is on the panel - the monitor's own
+ * name is already implied by where it sits on the map, so it is the first thing
+ * to go, then the connector. Container queries let each tile decide for itself
+ * rather than guessing from the window.
+ */
+/*
+ * Tile-sized, not viewport-sized.
+ *
+ * A four-monitor desk on a 220px panel gives a portrait tile about 40px. What
+ * matters at that size is which machine is on the panel - the monitor's own
+ * name is already implied by where it sits on the map, so detail is shed in
+ * order of usefulness. Container queries let each tile decide for itself
+ * instead of guessing from the window, which matters because a portrait rail
+ * and a landscape panel on the same map are wildly different widths.
+ */
+@container (max-width: 95px) {
+  .monitor-format {
+    display: none;
+  }
+}
+
+@container (max-width: 60px) {
+  .monitor-head {
+    display: none;
+  }
+
+  /* With the head gone, space-between would strand the source at the top. */
+  .monitor-overlay {
+    justify-content: center;
+  }
+}
+
+@container (max-width: 50px) {
+  .monitor-connector,
+  .monitor-pending,
+  .monitor-watermark {
+    display: none;
+  }
+}
+
+/*
+ * Height matters as much as width: a landscape panel on a narrow map is short
+ * and wide, so it runs out of vertical room for four stacked lines long before
+ * it runs out of horizontal room for any one of them.
+ */
+@container (max-height: 78px) {
+  .monitor-format {
+    display: none;
+  }
+}
+
+@container (max-height: 58px) {
+  .monitor-head,
+  .monitor-connector {
+    display: none;
+  }
+
+  .monitor-overlay {
+    justify-content: center;
+  }
 }
 
 .monitor-source {
@@ -211,6 +322,10 @@ button.monitor:active .monitor-frame {
   line-height: 1.1;
   color: #fff;
   text-align: center;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .monitor-source.is-stale {
@@ -255,6 +370,7 @@ button.monitor:active .monitor-frame {
   align-items: center;
   justify-content: space-between;
   gap: var(--space-4);
+  min-width: 0;
   padding-top: var(--space-5);
   border-top: 1px solid var(--border-subtle);
   font-size: var(--text-sm);
@@ -265,6 +381,14 @@ button.monitor:active .monitor-frame {
   align-items: center;
   gap: var(--space-3);
   color: var(--text-secondary);
+  min-width: 0;
+}
+
+.desk-footer-item span,
+.desk-footer-item {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .desk-footer-item[data-tone='ok'] {

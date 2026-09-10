@@ -127,6 +127,16 @@ curl -XPOST http://127.0.0.1:7420/api/desk/computers -H 'content-type: applicati
 curl -XPOST http://127.0.0.1:7420/api/desk/wiring -H 'content-type: application/json' -d '{"monitorId":"<id>","inputId":"input-0x11","computerId":"computer:manual:playstation-5"}'
 ```
 
+## Stopping the dev environment
+
+```bash
+pnpm dev:stop
+```
+
+Use it rather than killing by port. `pnpm dev` runs `tsx watch` supervisors, so killing the process
+holding a port just makes the supervisor spawn a replacement — which is how a simulated desk ends up
+quietly reconnecting to a real controller an hour later and mixing four fake monitors into it.
+
 ## UI work
 
 `apps/web` is built on a small design system in `apps/web/src/design`. Read

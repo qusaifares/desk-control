@@ -2,7 +2,7 @@ import type { DeskSnapshot, Monitor } from '@desk-control/domain';
 import { Chip, ListRow, Sheet, Slider, StatusDot, Stack } from '../design/index.js';
 import { CONNECTOR_COLORS } from '../lib/appearance.js';
 import { agentForComputer, computerById, displayNameOf, sourcesForMonitor } from '../lib/desk.js';
-import { MoonIcon, platformIcon } from './icons.js';
+import { computerIcon, MoonIcon } from './icons.js';
 
 interface Props {
   snapshot: DeskSnapshot;
@@ -109,7 +109,7 @@ export function SourcePicker({
           return (
             <ListRow
               key={computer.id}
-              icon={platformIcon(computer.platform)}
+              icon={computerIcon(computer)}
               title={displayNameOf(computer)}
               subtitle={detail}
               selected={isLive}

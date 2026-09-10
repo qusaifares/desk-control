@@ -12,6 +12,13 @@
   min-height: 100%;
   display: grid;
   grid-template-rows: auto 1fr auto;
+  /*
+   * Explicit minmax(0, 1fr) rather than the implicit `auto` column: an auto
+   * track sizes to max-content, so on a narrow screen wide content blows the
+   * shell out past the viewport instead of being constrained by it. This is the
+   * whole reason a 440px-wide panel used to scroll sideways.
+   */
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-6);
   padding: var(--space-6) var(--space-7);
   max-width: 1680px;
@@ -23,6 +30,12 @@
   grid-template-columns: 300px minmax(0, 1fr) 330px;
   gap: var(--space-6);
   align-items: stretch;
+  /*
+   * A grid item defaults to min-width: auto, meaning it refuses to shrink below
+   * its max-content. Without this the body sizes to the longest preset subtitle
+   * and pushes the whole panel sideways instead of ellipsising.
+   */
+  min-width: 0;
 }
 
 .ds-rail {
@@ -54,6 +67,52 @@
   .ds-shell {
     padding: var(--space-4);
     gap: var(--space-5);
+  }
+}
+
+/*
+ * Tall, narrow panels - the 440x1920 strip this is built for, and half of it
+ * again if it is split. Content packs to the top rather than floating in the
+ * middle of two metres of screen, and controls give up their decoration before
+ * they give up their touch target.
+ */
+@media (max-width: 520px) {
+  .ds-shell-body {
+    align-content: start;
+  }
+
+  .ds-stage {
+    justify-content: flex-start;
+  }
+
+  .ds-tile-grid {
+    grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+    gap: var(--space-3);
+  }
+
+  .ds-panel {
+    padding: var(--space-4);
+  }
+
+  .ds-row {
+    padding: var(--space-3);
+    gap: var(--space-3);
+  }
+}
+
+@media (max-width: 300px) {
+  /* Below this the icon costs more than it explains. The row keeps its
+     44px target; only the ornament goes. */
+  .ds-row-icon {
+    display: none;
+  }
+
+  .ds-tile-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .ds-swatch-row {
+    gap: var(--space-2);
   }
 }
 
@@ -459,7 +518,8 @@ button.ds-tile:active:not(:disabled) {
 
 .ds-field-input {
   flex: 1;
-  min-width: 160px;
+  /* No min-width: on a 220px panel a 160px floor overflows the container. */
+  min-width: 0;
   min-height: var(--control-min-height);
   padding: 0 var(--space-4);
   border-radius: var(--radius-md);
@@ -547,6 +607,40 @@ button.ds-tile:active:not(:disabled) {
 .ds-slider-input:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+/* ---------- swatches ---------- */
+
+.ds-swatch-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.ds-swatch,
+.ds-icon-choice {
+  width: var(--control-min-height);
+  height: var(--control-min-height);
+  border-radius: var(--radius-md);
+  border: 2px solid var(--border-subtle);
+  display: grid;
+  place-items: center;
+  transition: border-color var(--duration-fast) var(--ease-out);
+}
+
+.ds-icon-choice {
+  background: var(--surface-2);
+  color: var(--text-secondary);
+}
+
+.ds-swatch.is-selected,
+.ds-icon-choice.is-selected {
+  border-color: var(--text-primary);
+}
+
+.ds-icon-choice.is-selected {
+  color: var(--text-primary);
+  background: var(--surface-3);
 }
 
 /* ---------- feedback ---------- */

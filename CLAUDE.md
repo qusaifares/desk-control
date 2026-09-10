@@ -52,6 +52,7 @@ anything near providers.
 ```bash
 pnpm install
 pnpm dev          # controller (7420) + web (5173) + simulated desk (7430)
+pnpm dev:stop     # stop it - killing by port leaves tsx watch to respawn it
 pnpm --filter @desk-control/agent exec tsx src/index.ts probe   # real monitors on this machine
 pnpm test
 pnpm lint
@@ -100,8 +101,12 @@ Also specific to this product:
 - A monitor tile's coloured screen is an _identity_ treatment for the source machine - a
   deterministic hue plus a platform watermark. It must never read as a screen preview: this system
   does not touch the video path and the UI may not imply otherwise.
-- Every interactive element meets `--control-min-height` (44px). The primary client is a 5-7"
-  touchscreen.
+- Every interactive element meets `--control-min-height` (44px).
+- The target panel is **440x1920** (and 220 wide when split), not a landscape tablet. Check both at
+  `/viewport-test.html` after layout changes. Do not resize the browser window to test narrow
+  widths on Windows: Chrome clamps to a ~500px minimum and silently crops, which looks exactly like
+  an overflow bug that is not there.
+- Monitor tiles degrade by their own size via container queries, not by viewport width.
 - Controls for things that do not exist yet are rendered disabled with the reason attached, never
   hidden and never wired to a no-op. `QuickActions` is the worked example.
 - An agent whose `providerKind` is `mock` is badged **Simulated** in the UI. Mock hardware sitting

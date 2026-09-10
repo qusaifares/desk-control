@@ -1,12 +1,17 @@
 import type { DeskSnapshot } from '@desk-control/domain';
 import { useState } from 'react';
 import { Chip, ListRow, SectionLabel, Sheet, Stack, TextField } from '../design/index.js';
+import { COLORWAYS, colorwaySwatch } from '../lib/appearance.js';
 import { displayNameOf } from '../lib/desk.js';
-import { platformIcon } from './icons.js';
+import { CHOOSABLE_ICONS, computerIcon, iconByName } from './icons.js';
 
 interface Props {
   snapshot: DeskSnapshot;
   onRenameComputer: (computerId: string, customName: string | null) => void;
+  onSetAppearance: (
+    computerId: string,
+    patch: { icon?: string | null; colorway?: string | null },
+  ) => void;
   onClose: () => void;
 }
 
@@ -19,7 +24,7 @@ interface Props {
  * survives the agent restarting - and it never touches the computer's identity,
  * which stays derived from the machine itself.
  */
-export function SystemSheet({ snapshot, onRenameComputer, onClose }: Props) {
+export function SystemSheet({ snapshot, onRenameComputer, onSetAppearance, onClose }: Props) {
   const [renamingId, setRenamingId] = useState<string | null>(null);
 
   const renaming = renamingId
@@ -42,25 +47,63 @@ export function SystemSheet({ snapshot, onRenameComputer, onClose }: Props) {
           </>
         }
       >
-        <TextField
-          label="Display name"
-          value={renaming.customName ?? ''}
-          placeholder={renaming.detectedName}
-          hint={`Clearing this falls back to “${renaming.detectedName}”.`}
-          onSubmit={(value) => {
-            onRenameComputer(renaming.id, value);
-            setRenamingId(null);
-          }}
-          {...(renaming.customName
-            ? {
-                onClear: () => {
-                  onRenameComputer(renaming.id, null);
-                  setRenamingId(null);
-                },
-                clearLabel: 'Clear',
-              }
-            : {})}
-        />
+        <Stack>
+          <TextField
+            label="Display name"
+            value={renaming.customName ?? ''}
+            placeholder={renaming.detectedName}
+            hint={`Clearing this falls back to “${renaming.detectedName}”.`}
+            onSubmit={(value) => onRenameComputer(renaming.id, value)}
+            {...(renaming.customName
+              ? { onClear: () => onRenameComputer(renaming.id, null), clearLabel: 'Clear' }
+              : {})}
+          />
+
+          <span className="ds-field-label">Colourway</span>
+          <div className="ds-swatch-row">
+            {COLORWAYS.map((colorway) => (
+              <button
+                key={colorway.id}
+                type="button"
+                className={`ds-swatch${
+                  renaming.appearance.colorway === colorway.id ? ' is-selected' : ''
+                }`}
+                style={{ background: colorwaySwatch(colorway.id) }}
+                aria-label={colorway.label}
+                aria-pressed={renaming.appearance.colorway === colorway.id}
+                title={colorway.label}
+                onClick={() =>
+                  onSetAppearance(renaming.id, {
+                    colorway: renaming.appearance.colorway === colorway.id ? null : colorway.id,
+                  })
+                }
+              />
+            ))}
+          </div>
+
+          <span className="ds-field-label">Icon</span>
+          <div className="ds-swatch-row">
+            {CHOOSABLE_ICONS.map((name) => (
+              <button
+                key={name}
+                type="button"
+                className={`ds-icon-choice${
+                  renaming.appearance.icon === name ? ' is-selected' : ''
+                }`}
+                aria-label={name}
+                aria-pressed={renaming.appearance.icon === name}
+                title={name}
+                onClick={() =>
+                  onSetAppearance(renaming.id, {
+                    icon: renaming.appearance.icon === name ? null : name,
+                  })
+                }
+              >
+                {iconByName(name)}
+              </button>
+            ))}
+          </div>
+        </Stack>
       </Sheet>
     );
   }
@@ -100,7 +143,7 @@ export function SystemSheet({ snapshot, onRenameComputer, onClose }: Props) {
           return (
             <ListRow
               key={computer.id}
-              icon={platformIcon(computer.platform)}
+              icon={computerIcon(computer)}
               title={displayNameOf(computer)}
               subtitle={
                 agent

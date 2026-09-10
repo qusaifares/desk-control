@@ -71,13 +71,20 @@ export type UpdatePresetRequest = z.infer<typeof UpdatePresetRequestSchema>;
 export const DeletePresetRequestSchema = z.object({ presetId: z.string().min(1) });
 export type DeletePresetRequest = z.infer<typeof DeletePresetRequestSchema>;
 
-export const RenameRequestSchema = z.object({
-  entityType: z.enum(['computer', 'monitor', 'peripheral', 'preset']),
+/**
+ * Presentation overrides for any entity, keyed by its stable id.
+ *
+ * The entity type is implied by the id rather than passed in - ids are already
+ * namespaced. Omitted fields are left untouched; a field sent as null is
+ * cleared, which is how a custom name falls back to the detected one.
+ */
+export const SetOverrideRequestSchema = z.object({
   entityId: z.string().min(1),
-  /** null clears the custom name and falls back to the detected name. */
-  customName: z.string().min(1).max(120).nullable(),
+  customName: z.string().min(1).max(120).nullable().optional(),
+  icon: z.string().max(40).nullable().optional(),
+  colorway: z.string().max(40).nullable().optional(),
 });
-export type RenameRequest = z.infer<typeof RenameRequestSchema>;
+export type SetOverrideRequest = z.infer<typeof SetOverrideRequestSchema>;
 
 export const SetPlacementRequestSchema = z.object({
   monitorId: z.string().min(1),

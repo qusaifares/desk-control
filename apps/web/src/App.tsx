@@ -176,9 +176,7 @@ export function App() {
           snapshot={snapshot}
           monitor={selectedMonitor}
           onClose={() => setSelectedMonitorId(null)}
-          onRename={(customName) =>
-            void run(() => deskApi.rename('monitor', selectedMonitor.id, customName))
-          }
+          onRename={(customName) => void run(() => deskApi.rename(selectedMonitor.id, customName))}
           onSetWiring={(inputId, computerId) =>
             void run(() => deskApi.setWiring(selectedMonitor.id, inputId, computerId))
           }
@@ -196,9 +194,7 @@ export function App() {
           snapshot={snapshot}
           preset={editingPreset}
           onClose={() => setEditingPresetId(null)}
-          onRename={(customName) =>
-            void run(() => deskApi.rename('preset', editingPreset.id, customName))
-          }
+          onRename={(customName) => void run(() => deskApi.rename(editingPreset.id, customName))}
           onCaptureCurrent={() => {
             setEditingPresetId(null);
             void savePreset(() => deskApi.updatePresetToCurrent(editingPreset.id));
@@ -215,7 +211,10 @@ export function App() {
           snapshot={snapshot}
           onClose={() => setSystemOpen(false)}
           onRenameComputer={(computerId, customName) =>
-            void run(() => deskApi.rename('computer', computerId, customName))
+            void run(() => deskApi.rename(computerId, customName))
+          }
+          onSetAppearance={(computerId, patch) =>
+            void run(() => deskApi.setOverride(computerId, patch))
           }
         />
       ) : null}

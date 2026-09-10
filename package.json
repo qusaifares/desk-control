@@ -9,6 +9,7 @@
   },
   "scripts": {
     "dev": "turbo run dev --parallel",
+    "dev:stop": "bash scripts/stop-dev.sh",
     "build": "turbo run build",
     "test": "turbo run test",
     "test:watch": "vitest --watch",

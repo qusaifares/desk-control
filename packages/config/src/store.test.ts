@@ -30,7 +30,7 @@ describe('JsonFileConfigStore', () => {
     const { path, store } = await tempStore();
     await store.save(exampleDeskConfig());
     const raw = await readFile(path, 'utf8');
-    expect(raw).toContain('\n  "configVersion": 1');
+    expect(raw).toContain(`\n  "configVersion": 2`);
   });
 
   it('quarantines an invalid config instead of destroying it', async () => {
@@ -62,7 +62,7 @@ describe('empty desk seed', () => {
     expect(() => DeskConfigSchema.parse(config)).not.toThrow();
     expect(config.presets).toEqual([]);
     expect(config.layout.placements).toEqual({});
-    expect(config.customNames.monitors).toEqual({});
+    expect(config.overrides).toEqual({});
     expect(config.peripherals).toEqual([]);
   });
 });

@@ -1,4 +1,4 @@
-import type { DeskConfig } from '@desk-control/config';
+import { emptyOverride, type DeskConfig, type EntityOverride } from '@desk-control/config';
 import {
   captureDeskState,
   displayName,
@@ -159,12 +159,16 @@ export class DeskStore {
       id,
       kind: 'computer',
       detectedName: defaults?.detectedName ?? id.replace(/^computer:/, ''),
-      customName: this.config.customNames.computers[id] ?? null,
+      customName: this.overrideFor(id).customName,
       platform: (defaults?.platform ?? 'unknown') as Platform,
       capabilities: defaults?.capabilities ?? [],
       agentId: defaults?.agentId ?? null,
       connectivity: { state: 'unknown', lastSeenAt: null, detail: 'Never seen' },
       metadata: defaults?.metadata ?? {},
+      appearance: {
+        icon: this.overrideFor(id).icon,
+        colorway: this.overrideFor(id).colorway,
+      },
     };
     this.computers.set(id, created);
     return created;
@@ -179,7 +183,7 @@ export class DeskStore {
 
     const computer = this.ensureComputer(payload.computer.id);
     computer.detectedName = payload.computer.detectedName;
-    computer.customName = this.config.customNames.computers[payload.computer.id] ?? null;
+    computer.customName = this.overrideFor(payload.computer.id).customName;
     computer.platform = payload.computer.platform;
     computer.capabilities = payload.computer.capabilities;
     computer.metadata = payload.computer.metadata;
@@ -271,7 +275,7 @@ export class DeskStore {
         id: report.stableId,
         kind: 'monitor',
         detectedName: report.detectedName,
-        customName: this.config.customNames.monitors[report.stableId] ?? null,
+        customName: this.overrideFor(report.stableId).customName,
         identity: report.identity,
         // Union: if any reachable path can do it, the monitor can do it.
         capabilities: unionCapabilities(controlPaths.map((path) => path.capabilities)),
@@ -346,7 +350,7 @@ export class DeskStore {
         connector: input.connector,
         ddcInputSourceValue: input.ddcInputSourceValue,
         detectedName: input.detectedName,
-        customName: this.config.customNames.monitorInputs[`${report.stableId}:${input.id}`] ?? null,
+        customName: this.overrideFor(`${report.stableId}:${input.id}`).customName,
         connectedComputerId,
         maxMode: input.maxMode,
       };
@@ -506,47 +510,90 @@ export class DeskStore {
    * Names
    * ---------------------------------------------------------------- */
 
-  setCustomName(
-    entityType: 'computer' | 'monitor' | 'peripheral' | 'preset',
-    entityId: string,
-    customName: string | null,
-  ): boolean {
-    const assign = (bucket: Record<string, string>) => {
-      if (customName === null) delete bucket[entityId];
-      else bucket[entityId] = customName;
-    };
+  /** Reads an entity's overrides, defaulting rather than returning undefined. */
+  overrideFor(entityId: string): EntityOverride {
+    return this.config.overrides[entityId] ?? emptyOverride();
+  }
 
-    switch (entityType) {
-      case 'computer': {
-        const computer = this.computers.get(entityId);
-        if (!computer) return false;
-        assign(this.config.customNames.computers);
-        computer.customName = customName;
-        break;
-      }
-      case 'monitor': {
-        const monitor = this.monitors.get(entityId);
-        if (!monitor) return false;
-        assign(this.config.customNames.monitors);
-        monitor.customName = customName;
-        break;
-      }
-      case 'peripheral': {
-        const peripheral = this.config.peripherals.find((candidate) => candidate.id === entityId);
-        if (!peripheral) return false;
-        assign(this.config.customNames.peripherals);
-        peripheral.customName = customName;
-        break;
-      }
-      case 'preset': {
-        const preset = this.config.presets.find((candidate) => candidate.id === entityId);
-        if (!preset) return false;
-        preset.customName = customName;
-        break;
-      }
+  /**
+   * Finds the live entity an override applies to.
+   *
+   * Ids are namespaced, so the type is implied rather than passed in. Monitor
+   * inputs are the one composite: `<monitorId>:<inputId>`, split at the last
+   * colon because an input id never contains one.
+   */
+  private entityExists(entityId: string): boolean {
+    if (this.computers.has(entityId)) return true;
+    if (this.monitors.has(entityId)) return true;
+    if (this.config.peripherals.some((candidate) => candidate.id === entityId)) return true;
+    if (this.config.presets.some((candidate) => candidate.id === entityId)) return true;
+
+    const split = entityId.lastIndexOf(':');
+    if (split > 0) {
+      const monitor = this.monitors.get(entityId.slice(0, split));
+      const inputId = entityId.slice(split + 1);
+      if (monitor?.inputs.some((input) => input.id === inputId)) return true;
     }
+    return false;
+  }
+
+  /**
+   * Applies a presentation override.
+   *
+   * Presentation only: this can never change what a command does. Fields left
+   * undefined are untouched; a field set to null is cleared, which is how a
+   * custom name falls back to the detected one.
+   */
+  setOverride(entityId: string, patch: Partial<EntityOverride>): boolean {
+    if (!this.entityExists(entityId)) return false;
+
+    const next: EntityOverride = { ...this.overrideFor(entityId), ...patch };
+
+    if (next.customName === null && next.icon === null && next.colorway === null) {
+      delete this.config.overrides[entityId];
+    } else {
+      this.config.overrides[entityId] = next;
+    }
+
+    this.applyOverride(entityId, next);
     this.markConfigDirty();
     return true;
+  }
+
+  /** Pushes an override onto the live entity so the next snapshot reflects it. */
+  private applyOverride(entityId: string, override: EntityOverride): void {
+    const computer = this.computers.get(entityId);
+    if (computer) {
+      computer.customName = override.customName;
+      computer.appearance = { icon: override.icon, colorway: override.colorway };
+      return;
+    }
+
+    const monitor = this.monitors.get(entityId);
+    if (monitor) {
+      monitor.customName = override.customName;
+      return;
+    }
+
+    const peripheral = this.config.peripherals.find((candidate) => candidate.id === entityId);
+    if (peripheral) {
+      peripheral.customName = override.customName;
+      return;
+    }
+
+    const preset = this.config.presets.find((candidate) => candidate.id === entityId);
+    if (preset) {
+      preset.customName = override.customName;
+      return;
+    }
+
+    const split = entityId.lastIndexOf(':');
+    if (split > 0) {
+      const owner = this.monitors.get(entityId.slice(0, split));
+      const inputId = entityId.slice(split + 1);
+      const input = owner?.inputs.find((candidate) => candidate.id === inputId);
+      if (input) input.customName = override.customName;
+    }
   }
 
   /**
@@ -575,7 +622,8 @@ export class DeskStore {
   /**
    * Declares what is plugged into a monitor input.
    *
-   * Discovery covers inputs an agent sits on; this covers the rest - a console,
+   * Unlike an override, this is a *fact assertion* and it drives routing:
+   * discovery covers inputs an agent sits on, this covers the rest - a console,
    * or a laptop with nothing installed. A user override always beats what
    * discovery inferred.
    */

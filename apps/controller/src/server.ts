@@ -6,7 +6,7 @@ import {
   DeclareComputerRequestSchema,
   DeletePresetRequestSchema,
   UpdatePresetRequestSchema,
-  RenameRequestSchema,
+  SetOverrideRequestSchema,
   SetMonitorSourceRequestSchema,
   SetMonitorBrightnessRequestSchema,
   SetMonitorPowerRequestSchema,
@@ -270,22 +270,19 @@ export async function createServer(options: {
     return { accepted: true, commandIds: [], skipped: [] };
   });
 
-  app.post('/api/desk/name', async (request, reply) => {
-    const parsed = RenameRequestSchema.safeParse(request.body);
+  app.post('/api/desk/override', async (request, reply) => {
+    const parsed = SetOverrideRequestSchema.safeParse(request.body);
     if (!parsed.success) {
       return reply
         .status(400)
         .send({ error: { code: 'INVALID_REQUEST', message: parsed.error.message } });
     }
-    const ok = store.setCustomName(
-      parsed.data.entityType,
-      parsed.data.entityId,
-      parsed.data.customName,
-    );
-    if (!ok) {
+
+    const { entityId, ...patch } = parsed.data;
+    if (!store.setOverride(entityId, patch)) {
       return reply
         .status(404)
-        .send({ error: { code: 'UNKNOWN_TARGET', message: 'Unknown entity' } });
+        .send({ error: { code: 'UNKNOWN_TARGET', message: `Unknown entity ${entityId}` } });
     }
     return { accepted: true, commandIds: [], skipped: [] };
   });

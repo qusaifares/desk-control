@@ -350,25 +350,27 @@ const EXAMPLE_PRESETS: Preset[] = [
 /** First-run config. Written to disk once, then owned by the user. */
 export function exampleDeskConfig(): DeskConfig {
   return {
-    configVersion: 1,
+    configVersion: 2,
     controller: { id: 'controller:local', name: 'Desk Controller' },
     layout: EXAMPLE_LAYOUT,
     presets: EXAMPLE_PRESETS,
-    customNames: {
-      computers: {
-        [EXAMPLE_COMPUTER_IDS.gamingPc]: 'Gaming PC',
-        [EXAMPLE_COMPUTER_IDS.m4MacBook]: 'M4 MacBook',
-        [EXAMPLE_COMPUTER_IDS.m2MacBook]: 'M2 MacBook',
-        [EXAMPLE_COMPUTER_IDS.surface]: 'Surface',
+    overrides: {
+      [EXAMPLE_COMPUTER_IDS.gamingPc]: {
+        customName: 'Gaming PC',
+        icon: 'gamepad',
+        colorway: 'ember',
       },
-      monitors: {
-        [EXAMPLE_MONITOR_IDS.topLandscape]: 'Top',
-        [EXAMPLE_MONITOR_IDS.bottomLandscape]: 'Bottom',
-        [EXAMPLE_MONITOR_IDS.leftPortrait]: 'Left Rail',
-        [EXAMPLE_MONITOR_IDS.rightPortrait]: 'Right Rail',
+      [EXAMPLE_COMPUTER_IDS.m4MacBook]: {
+        customName: 'M4 MacBook',
+        icon: null,
+        colorway: 'violet',
       },
-      monitorInputs: {},
-      peripherals: {},
+      [EXAMPLE_COMPUTER_IDS.m2MacBook]: { customName: 'M2 MacBook', icon: null, colorway: null },
+      [EXAMPLE_COMPUTER_IDS.surface]: { customName: 'Surface', icon: null, colorway: 'cobalt' },
+      [EXAMPLE_MONITOR_IDS.topLandscape]: { customName: 'Top', icon: null, colorway: null },
+      [EXAMPLE_MONITOR_IDS.bottomLandscape]: { customName: 'Bottom', icon: null, colorway: null },
+      [EXAMPLE_MONITOR_IDS.leftPortrait]: { customName: 'Left Rail', icon: null, colorway: null },
+      [EXAMPLE_MONITOR_IDS.rightPortrait]: { customName: 'Right Rail', icon: null, colorway: null },
     },
     peripherals: [
       {

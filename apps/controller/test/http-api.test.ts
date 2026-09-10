@@ -73,12 +73,8 @@ describe('client API', () => {
   it('applies a custom name without touching hardware identity', async () => {
     const response = await harness.server.app.inject({
       method: 'POST',
-      url: '/api/desk/name',
-      payload: {
-        entityType: 'monitor',
-        entityId: EXAMPLE_MONITOR_IDS.topLandscape,
-        customName: 'Cinema',
-      },
+      url: '/api/desk/override',
+      payload: { entityId: EXAMPLE_MONITOR_IDS.topLandscape, customName: 'Cinema' },
     });
     expect(response.statusCode).toBe(200);
 
@@ -91,16 +87,74 @@ describe('client API', () => {
   it('clears a custom name back to the detected name', async () => {
     await harness.server.app.inject({
       method: 'POST',
-      url: '/api/desk/name',
-      payload: {
-        entityType: 'computer',
-        entityId: EXAMPLE_COMPUTER_IDS.gamingPc,
-        customName: null,
-      },
+      url: '/api/desk/override',
+      payload: { entityId: EXAMPLE_COMPUTER_IDS.gamingPc, customName: null },
     });
     const computer = harness.store.computers.get(EXAMPLE_COMPUTER_IDS.gamingPc);
     expect(computer?.customName).toBeNull();
     expect(computer?.detectedName).toBe('DESKTOP-GAMING');
+  });
+});
+
+describe('desk editing routes', () => {
+  /*
+   * Route-level coverage on purpose: the store methods behind these are tested
+   * directly elsewhere, which meant a refactor could delete the routes and
+   * every test still passed. It did, once.
+   */
+  it('exposes every desk editing endpoint', async () => {
+    const monitorId = EXAMPLE_MONITOR_IDS.topLandscape;
+
+    const declared = await harness.server.app.inject({
+      method: 'POST',
+      url: '/api/desk/computers',
+      payload: { detectedName: 'PlayStation 5', platform: 'unknown' },
+    });
+    expect(declared.statusCode).toBe(200);
+    const computerId = (declared.json() as { computerId: string }).computerId;
+
+    const wiring = await harness.server.app.inject({
+      method: 'POST',
+      url: '/api/desk/wiring',
+      payload: { monitorId, inputId: 'input-usbc', computerId },
+    });
+    expect(wiring.statusCode).toBe(200);
+
+    const layout = await harness.server.app.inject({
+      method: 'POST',
+      url: '/api/desk/layout',
+      payload: {
+        monitorId,
+        placement: { x: 1, y: 2, width: 16, height: 9, orientation: 'landscape' },
+      },
+    });
+    expect(layout.statusCode).toBe(200);
+    expect(harness.store.monitors.get(monitorId)?.placement).toMatchObject({ x: 1, y: 2 });
+  });
+
+  it('404s on an unknown target and 400s on a malformed body', async () => {
+    expect(
+      (
+        await harness.server.app.inject({
+          method: 'POST',
+          url: '/api/desk/layout',
+          payload: {
+            monitorId: 'monitor:ghost',
+            placement: { x: 0, y: 0, width: 1, height: 1, orientation: 'landscape' },
+          },
+        })
+      ).statusCode,
+    ).toBe(404);
+
+    expect(
+      (
+        await harness.server.app.inject({
+          method: 'POST',
+          url: '/api/desk/wiring',
+          payload: { monitorId: EXAMPLE_MONITOR_IDS.topLandscape },
+        })
+      ).statusCode,
+    ).toBe(400);
   });
 });
 

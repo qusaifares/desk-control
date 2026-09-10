@@ -1,0 +1,70 @@
+{
+  "configVersion": 2,
+  "controller": {
+    "id": "controller:local",
+    "name": "Desk Controller"
+  },
+  "layout": {
+    "id": "layout:default",
+    "name": "My desk",
+    "grid": {
+      "columns": 33,
+      "rows": 9
+    },
+    "placements": {
+      "monitor:aus:pa278cv:n6lmqs137321": {
+        "x": 0,
+        "y": 0,
+        "width": 16,
+        "height": 9,
+        "orientation": "landscape",
+        "autoPlaced": false
+      },
+      "monitor:aus:asus-pa279:383842": {
+        "x": 17,
+        "y": 0,
+        "width": 16,
+        "height": 9,
+        "orientation": "landscape",
+        "autoPlaced": true
+      }
+    }
+  },
+  "presets": [],
+  "overrides": {
+    "computer:qusaipc": {
+      "customName": "Battlestation",
+      "icon": null,
+      "colorway": null
+    },
+    "monitor:aus:pa278cv:n6lmqs137321": {
+      "customName": "Top",
+      "icon": null,
+      "colorway": null
+    },
+    "monitor:aus:asus-pa279:383842": {
+      "customName": "Right",
+      "icon": null,
+      "colorway": null
+    }
+  },
+  "peripherals": [],
+  "peripheralSwitches": [],
+  "wiringOverrides": {
+    "monitor:aus:asus-pa279:383842": {
+      "input-0x11": "computer:manual:ps5"
+    }
+  },
+  "manualComputers": [
+    {
+      "id": "computer:manual:ps5",
+      "detectedName": "PlayStation 5",
+      "platform": "unknown"
+    }
+  ],
+  "lastDesiredState": {
+    "monitorSources": {},
+    "peripheralOwners": {},
+    "activePresetId": null
+  }
+}

@@ -26,6 +26,7 @@ export function aComputer(overrides: Partial<Computer> = {}): Computer {
     agentId: 'agent:test',
     connectivity: { state: 'online', lastSeenAt: now(), detail: null },
     metadata: {},
+    appearance: { icon: null, colorway: null },
     ...overrides,
   };
 }

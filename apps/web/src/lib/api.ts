@@ -39,11 +39,13 @@ export const deskApi = {
     post('/api/desk/monitor-power', { monitorId, powerState }),
   setAllDisplaysPower: (powerState: 'on' | 'standby' | 'off') =>
     post('/api/desk/monitor-power', { powerState }),
-  rename: (
-    entityType: 'computer' | 'monitor' | 'peripheral' | 'preset',
+  /** Presentation overrides. Omitted fields are left as they are. */
+  setOverride: (
     entityId: string,
-    customName: string | null,
-  ) => post('/api/desk/name', { entityType, entityId, customName }),
+    patch: { customName?: string | null; icon?: string | null; colorway?: string | null },
+  ) => post('/api/desk/override', { entityId, ...patch }),
+  rename: (entityId: string, customName: string | null) =>
+    post('/api/desk/override', { entityId, customName }),
   setPlacement: (monitorId: string, placement: PlacementInput) =>
     post('/api/desk/layout', { monitorId, placement }),
   setWiring: (monitorId: string, inputId: string, computerId: string | null) =>

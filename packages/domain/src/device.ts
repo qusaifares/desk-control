@@ -36,6 +36,16 @@ export const ComputerSchema = NameableSchema.extend({
   agentId: IdSchema.nullable().default(null),
   connectivity: ConnectivitySchema,
   metadata: z.record(z.string()).default({}),
+  /**
+   * User-chosen presentation. Purely cosmetic - it never affects routing, and
+   * the UI falls back to a platform default when unset.
+   */
+  appearance: z
+    .object({
+      icon: z.string().nullable().default(null),
+      colorway: z.string().nullable().default(null),
+    })
+    .default({ icon: null, colorway: null }),
 });
 export type Computer = z.infer<typeof ComputerSchema>;
 

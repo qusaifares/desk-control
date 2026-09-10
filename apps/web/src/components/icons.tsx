@@ -232,6 +232,14 @@ export function LinkIcon({ size = 20, className }: IconProps) {
   );
 }
 
+/** A computer's icon: what the user chose, else its platform. */
+export function computerIcon(
+  computer: { platform: Platform; appearance?: { icon: string | null } },
+  size = 20,
+) {
+  return iconByName(computer.appearance?.icon, size) ?? platformIcon(computer.platform, size);
+}
+
 export function platformIcon(platform: Platform, size = 20) {
   switch (platform) {
     case 'windows':
@@ -242,6 +250,38 @@ export function platformIcon(platform: Platform, size = 20) {
       return <LinuxIcon size={size} />;
     default:
       return <MonitorIcon size={size} />;
+  }
+}
+
+/** Icons a user can choose for a computer. Ids are stored, not the markup. */
+export const CHOOSABLE_ICONS = [
+  'monitor',
+  'windows',
+  'apple',
+  'linux',
+  'gamepad',
+  'briefcase',
+  'grid',
+] as const;
+
+export function iconByName(name: string | null | undefined, size = 20) {
+  switch (name) {
+    case 'windows':
+      return <WindowsIcon size={size} />;
+    case 'apple':
+      return <AppleIcon size={size} />;
+    case 'linux':
+      return <LinuxIcon size={size} />;
+    case 'gamepad':
+      return <GamepadIcon size={size} />;
+    case 'briefcase':
+      return <BriefcaseIcon size={size} />;
+    case 'grid':
+      return <GridIcon size={size} />;
+    case 'monitor':
+      return <MonitorIcon size={size} />;
+    default:
+      return null;
   }
 }
 

@@ -8,7 +8,7 @@ import {
   STATUS_TONE,
 } from '../lib/appearance.js';
 import { computerById, displayNameOf, STATUS_LABELS } from '../lib/desk.js';
-import { platformIcon } from './icons.js';
+import { computerIcon } from './icons.js';
 
 interface Props {
   snapshot: DeskSnapshot;
@@ -80,9 +80,7 @@ export function MonitorTile({
           className="monitor-screen"
           style={screenStyle(shown, isStale || status !== 'in-sync')}
         >
-          <span className="monitor-watermark">
-            {shown ? platformIcon(shown.platform, 24) : null}
-          </span>
+          <span className="monitor-watermark">{shown ? computerIcon(shown, 24) : null}</span>
         </span>
 
         <span className="monitor-overlay">

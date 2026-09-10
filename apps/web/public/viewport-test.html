@@ -1,0 +1,52 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>Desk Control — viewport test</title>
+<!--
+  Renders the app at the exact panel sizes it has to work on.
+
+  Why an iframe rather than just resizing the browser: Chrome on Windows clamps
+  a window to a ~500px minimum width, so a --window-size=440 screenshot lays out
+  at 500 and silently crops the result. It looks like the UI overflows when it
+  does not. An iframe has its own layout viewport, so media queries respond to
+  its width honestly at any size.
+
+  Open http://127.0.0.1:5173/viewport-test.html
+-->
+<style>
+  body {
+    margin: 0;
+    background: #05070a;
+    font:
+      12px ui-sans-serif,
+      system-ui,
+      sans-serif;
+    color: #8b93a1;
+    display: flex;
+    gap: 16px;
+    padding: 16px;
+    align-items: flex-start;
+  }
+  figure {
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  figcaption {
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  iframe {
+    border: 1px solid #2a3340;
+    background: #0a0c0f;
+    display: block;
+  }
+</style>
+<figure>
+  <figcaption>440 × 1920 — the panel</figcaption>
+  <iframe src="/" width="440" height="1920" title="440 wide"></iframe>
+</figure>
+<figure>
+  <figcaption>220 × 1920 — split shell</figcaption>
+  <iframe src="/" width="220" height="1920" title="220 wide"></iframe>
+</figure>

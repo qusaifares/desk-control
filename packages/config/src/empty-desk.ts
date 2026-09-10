@@ -10,7 +10,7 @@ import type { DeskConfig } from './schema.js';
  */
 export function emptyDeskConfig(): DeskConfig {
   return {
-    configVersion: 1,
+    configVersion: 2,
     controller: { id: 'controller:local', name: 'Desk Controller' },
     layout: {
       id: 'layout:default',
@@ -19,7 +19,7 @@ export function emptyDeskConfig(): DeskConfig {
       placements: {},
     },
     presets: [],
-    customNames: { computers: {}, monitors: {}, monitorInputs: {}, peripherals: {} },
+    overrides: {},
     peripherals: [],
     peripheralSwitches: [],
     wiringOverrides: {},

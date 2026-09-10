@@ -1,5 +1,6 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
+import { migrateDeskConfig } from './migrate.js';
 import { DeskConfigSchema, type DeskConfig } from './schema.js';
 
 /**
@@ -31,7 +32,10 @@ export class JsonFileConfigStore implements ConfigStore {
       throw error;
     }
 
-    const parsed = DeskConfigSchema.safeParse(JSON.parse(raw));
+    // Migrate before validating: an older config does not satisfy the current
+    // schema by definition.
+    const migrated = migrateDeskConfig(JSON.parse(raw));
+    const parsed = DeskConfigSchema.safeParse(migrated.config);
     if (!parsed.success) {
       // Never silently discard a user's desk. Keep the bad file aside so it can
       // be inspected, and let the caller fall back to defaults.
