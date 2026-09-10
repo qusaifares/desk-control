@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { MonitorSchema, type Monitor } from './monitor.js';
 import type { Peripheral } from './peripheral.js';
-import { planPreset, PresetSchema } from './preset.js';
+import { captureDeskState, planPreset, PresetSchema } from './preset.js';
 
 const monitor = (id: string, wiring: Record<string, string>): Monitor =>
   MonitorSchema.parse({
@@ -138,5 +138,109 @@ describe('planPreset', () => {
     expect(planPreset(roundTripped, { monitors, peripherals: [] })).toEqual(
       planPreset(preset, { monitors, peripherals: [] }),
     );
+  });
+});
+
+describe('captureDeskState', () => {
+  const observedMonitor = (
+    monitorId: string,
+    source: string | null,
+    reachability: 'reachable' | 'unreachable' | 'unknown' = 'reachable',
+  ) => ({
+    monitorId,
+    activeInputId: 'input-0x0f',
+    activeSourceComputerId: source,
+    powerState: 'on' as const,
+    brightness: null,
+    reachability,
+    observedAt: '2026-01-01T00:00:00.000Z',
+    reportedByAgentId: 'agent:a',
+    lastError: null,
+  });
+
+  const monitors = [
+    monitor('monitor:top', { 'input-dp1': 'computer:pc' }),
+    monitor('monitor:left', { 'input-dp1': 'computer:pc' }),
+  ];
+
+  it('captures what is actually on screen', () => {
+    const captured = captureDeskState({
+      monitors,
+      peripherals: [keyboard],
+      observedMonitors: {
+        'monitor:top': observedMonitor('monitor:top', 'computer:pc'),
+        'monitor:left': observedMonitor('monitor:left', 'computer:mac'),
+      },
+      observedPeripherals: {
+        'peripheral:kb': {
+          peripheralId: 'peripheral:kb',
+          ownerComputerId: 'computer:pc',
+          reachability: 'reachable',
+          observedAt: '2026-01-01T00:00:00.000Z',
+          lastError: null,
+        },
+      },
+    });
+
+    expect(captured.assignments.monitorSources).toEqual({
+      'monitor:top': 'computer:pc',
+      'monitor:left': 'computer:mac',
+    });
+    expect(captured.assignments.peripheralOwners).toEqual({ 'peripheral:kb': 'computer:pc' });
+    expect(captured.skipped).toEqual([]);
+  });
+
+  it('leaves out a monitor it cannot currently see, rather than guessing', () => {
+    const captured = captureDeskState({
+      monitors,
+      peripherals: [],
+      observedMonitors: {
+        'monitor:top': observedMonitor('monitor:top', 'computer:pc'),
+        'monitor:left': observedMonitor('monitor:left', null, 'unreachable'),
+      },
+      observedPeripherals: {},
+    });
+
+    expect(captured.assignments.monitorSources).toEqual({ 'monitor:top': 'computer:pc' });
+    expect(captured.skipped).toEqual([
+      { target: 'monitor', targetId: 'monitor:left', reason: 'unreachable' },
+    ]);
+  });
+
+  it('leaves out a monitor that has never been observed', () => {
+    const captured = captureDeskState({
+      monitors,
+      peripherals: [],
+      observedMonitors: { 'monitor:top': observedMonitor('monitor:top', 'computer:pc') },
+      observedPeripherals: {},
+    });
+    expect(captured.skipped).toEqual([
+      { target: 'monitor', targetId: 'monitor:left', reason: 'not-observed' },
+    ]);
+  });
+
+  it('round-trips: capturing then planning reproduces the same desk', () => {
+    const captured = captureDeskState({
+      monitors,
+      peripherals: [],
+      observedMonitors: {
+        'monitor:top': observedMonitor('monitor:top', 'computer:pc'),
+        'monitor:left': observedMonitor('monitor:left', 'computer:pc'),
+      },
+      observedPeripherals: {},
+    });
+
+    const preset = PresetSchema.parse({
+      id: 'preset:captured',
+      detectedName: 'Captured',
+      assignments: captured.assignments,
+    });
+
+    const plan = planPreset(preset, { monitors, peripherals: [] });
+    expect(plan.skipped).toEqual([]);
+    expect(plan.intents.map((intent) => intent.targetId).sort()).toEqual([
+      'monitor:left',
+      'monitor:top',
+    ]);
   });
 });

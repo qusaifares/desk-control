@@ -1,11 +1,18 @@
 import type { ReactNode } from 'react';
-import { AlertCircleIcon } from '../../components/icons.js';
+import { AlertCircleIcon, CheckCircleIcon } from '../../components/icons.js';
+import type { Tone } from './types.js';
 
-/** Inline error banner. One treatment, used wherever an action can fail. */
-export function Notice({ children }: { children: ReactNode }) {
+/**
+ * Inline banner. One treatment for anything the app needs to say back.
+ *
+ * Takes a tone because not everything worth saying is a failure: a preset that
+ * saved three displays and skipped one is a warning, and colouring it like an
+ * error would overstate it.
+ */
+export function Notice({ tone = 'bad', children }: { tone?: Tone; children: ReactNode }) {
   return (
-    <p className="ds-notice" role="alert">
-      <AlertCircleIcon size={18} />
+    <p className="ds-notice" data-tone={tone} role={tone === 'bad' ? 'alert' : 'status'}>
+      {tone === 'ok' ? <CheckCircleIcon size={18} /> : <AlertCircleIcon size={18} />}
       {children}
     </p>
   );

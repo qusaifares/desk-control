@@ -114,6 +114,7 @@ Everything the desk needs is editable from the UI - press **Edit desk**:
 - drag a display to arrange it (snaps to half a grid unit)
 - tap a display to rename it, or to say what is plugged into each of its inputs
 - add a machine that has no agent, and wire it to an input
+- save the desk as a preset, or update, rename and delete an existing one
 
 Edits are written to `desk-config.json` as you make them. The equivalent API calls, if you prefer
 curl:

@@ -44,6 +44,33 @@ export const ApplyPresetRequestSchema = z.object({
 });
 export type ApplyPresetRequest = z.infer<typeof ApplyPresetRequestSchema>;
 
+const PresetAssignmentInputSchema = z.object({
+  monitorSources: z.record(z.string(), z.string()).default({}),
+  peripheralOwners: z.record(z.string(), z.string()).default({}),
+});
+
+export const CreatePresetRequestSchema = z.object({
+  detectedName: z.string().min(1).max(60),
+  description: z.string().max(200).nullable().optional(),
+  icon: z.string().max(40).nullable().optional(),
+  /** Omit to capture whatever the desk is showing right now. */
+  assignments: PresetAssignmentInputSchema.optional(),
+});
+export type CreatePresetRequest = z.infer<typeof CreatePresetRequestSchema>;
+
+export const UpdatePresetRequestSchema = z.object({
+  presetId: z.string().min(1),
+  description: z.string().max(200).nullable().optional(),
+  icon: z.string().max(40).nullable().optional(),
+  assignments: PresetAssignmentInputSchema.optional(),
+  /** Replace the preset's assignments with the desk as it is right now. */
+  captureCurrent: z.boolean().optional(),
+});
+export type UpdatePresetRequest = z.infer<typeof UpdatePresetRequestSchema>;
+
+export const DeletePresetRequestSchema = z.object({ presetId: z.string().min(1) });
+export type DeletePresetRequest = z.infer<typeof DeletePresetRequestSchema>;
+
 export const RenameRequestSchema = z.object({
   entityType: z.enum(['computer', 'monitor', 'peripheral', 'preset']),
   entityId: z.string().min(1),

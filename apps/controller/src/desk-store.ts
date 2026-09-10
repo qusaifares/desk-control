@@ -1,5 +1,6 @@
 import type { DeskConfig } from '@desk-control/config';
 import {
+  captureDeskState,
   displayName,
   slugify,
   unionCapabilities,
@@ -14,6 +15,8 @@ import {
   type ObservedPeripheralState,
   type Placement,
   type Platform,
+  type Preset,
+  type PresetAssignment,
 } from '@desk-control/domain';
 import type {
   AgentHelloPayloadSchema,
@@ -607,6 +610,75 @@ export class DeskStore {
     computer.metadata = { ...computer.metadata, declaredByUser: 'true' };
     this.markConfigDirty();
     return computer;
+  }
+
+  /* ---------------------------------------------------------------- *
+   * Presets
+   * ---------------------------------------------------------------- */
+
+  /** Slug-based ids keep the config readable; a clash gets a numeric suffix. */
+  private uniquePresetId(name: string): string {
+    const base = `preset:${slugify(name) || 'preset'}`;
+    if (!this.config.presets.some((preset) => preset.id === base)) return base;
+    for (let suffix = 2; suffix < 500; suffix += 1) {
+      const candidate = `${base}-${suffix}`;
+      if (!this.config.presets.some((preset) => preset.id === candidate)) return candidate;
+    }
+    return `${base}-${Date.now()}`;
+  }
+
+  createPreset(input: {
+    detectedName: string;
+    description?: string | null;
+    icon?: string | null;
+    assignments: PresetAssignment;
+  }): Preset {
+    const preset: Preset = {
+      id: this.uniquePresetId(input.detectedName),
+      detectedName: input.detectedName,
+      customName: null,
+      description: input.description ?? null,
+      icon: input.icon ?? null,
+      sortOrder:
+        this.config.presets.reduce((max, candidate) => Math.max(max, candidate.sortOrder), -1) + 1,
+      assignments: input.assignments,
+    };
+    this.config.presets = [...this.config.presets, preset];
+    this.markConfigDirty();
+    return preset;
+  }
+
+  updatePreset(
+    presetId: string,
+    patch: { assignments?: PresetAssignment; description?: string | null; icon?: string | null },
+  ): boolean {
+    const preset = this.config.presets.find((candidate) => candidate.id === presetId);
+    if (!preset) return false;
+    if (patch.assignments) preset.assignments = patch.assignments;
+    if (patch.description !== undefined) preset.description = patch.description;
+    if (patch.icon !== undefined) preset.icon = patch.icon;
+    this.markConfigDirty();
+    return true;
+  }
+
+  deletePreset(presetId: string): boolean {
+    const before = this.config.presets.length;
+    this.config.presets = this.config.presets.filter((preset) => preset.id !== presetId);
+    if (this.config.presets.length === before) return false;
+    // A deleted preset must not stay flagged as the active one.
+    if (this.desired.activePresetId === presetId) this.desired.activePresetId = null;
+    this.markConfigDirty();
+    return true;
+  }
+
+  /** Captures the desk as it is observed right now. */
+  captureCurrentDesk() {
+    return captureDeskState({
+      monitors: [...this.monitors.values()],
+      peripherals: this.config.peripherals,
+      observedMonitors: this.observedMonitors(),
+      observedPeripherals: this.observedPeripherals(),
+    });
   }
 
   /** Convenience for logs. */

@@ -3,6 +3,7 @@ import { IdSchema } from './ids.js';
 import { findInputForComputer, type Monitor } from './monitor.js';
 import { NameableSchema } from './naming.js';
 import type { Peripheral } from './peripheral.js';
+import type { ObservedMonitorState, ObservedPeripheralState } from './state.js';
 
 /**
  * Presets are DATA. They contain no behaviour and no special-cased application
@@ -49,6 +50,61 @@ export interface PresetPlan {
   presetId: string;
   intents: PresetIntent[];
   skipped: PresetSkip[];
+}
+
+export type CaptureSkipReason = 'not-observed' | 'unreachable';
+
+export interface CapturedDeskState {
+  assignments: PresetAssignment;
+  /** Targets left out, with why. A preset should not invent what it cannot see. */
+  skipped: Array<{ target: 'monitor' | 'peripheral'; targetId: string; reason: CaptureSkipReason }>;
+}
+
+/**
+ * Captures what is on the desk right now as preset assignments.
+ *
+ * Reads OBSERVED state, not desired: "save this" means the arrangement you can
+ * actually see, not the one that was last asked for and may have failed.
+ *
+ * Anything we cannot currently see is left out rather than guessed - a monitor
+ * that is unreachable, or one that has never been observed, would otherwise be
+ * baked into the preset as a stale assumption. The caller is told what was
+ * skipped so it can say so.
+ */
+export function captureDeskState(input: {
+  monitors: readonly Monitor[];
+  peripherals: readonly Peripheral[];
+  observedMonitors: Readonly<Record<string, ObservedMonitorState>>;
+  observedPeripherals: Readonly<Record<string, ObservedPeripheralState>>;
+}): CapturedDeskState {
+  const assignments: PresetAssignment = { monitorSources: {}, peripheralOwners: {} };
+  const skipped: CapturedDeskState['skipped'] = [];
+
+  for (const monitor of input.monitors) {
+    const observed = input.observedMonitors[monitor.id];
+    // Order matters: an unreachable monitor also has no source, and "we cannot
+    // reach it" is the more useful of the two reasons to report.
+    if (observed?.reachability === 'unreachable') {
+      skipped.push({ target: 'monitor', targetId: monitor.id, reason: 'unreachable' });
+      continue;
+    }
+    if (!observed || observed.reachability === 'unknown' || !observed.activeSourceComputerId) {
+      skipped.push({ target: 'monitor', targetId: monitor.id, reason: 'not-observed' });
+      continue;
+    }
+    assignments.monitorSources[monitor.id] = observed.activeSourceComputerId;
+  }
+
+  for (const peripheral of input.peripherals) {
+    const observed = input.observedPeripherals[peripheral.id];
+    if (!observed || !observed.ownerComputerId) {
+      skipped.push({ target: 'peripheral', targetId: peripheral.id, reason: 'not-observed' });
+      continue;
+    }
+    assignments.peripheralOwners[peripheral.id] = observed.ownerComputerId;
+  }
+
+  return { assignments, skipped };
 }
 
 /**

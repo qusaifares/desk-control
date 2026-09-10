@@ -563,6 +563,18 @@ button.ds-tile:active:not(:disabled) {
   color: var(--tone-bad);
 }
 
+.ds-notice[data-tone='warn'] {
+  border-color: var(--tone-warn-border);
+  background: var(--tone-warn-soft);
+  color: var(--tone-warn);
+}
+
+.ds-notice[data-tone='ok'] {
+  border-color: var(--tone-ok-border);
+  background: var(--tone-ok-soft);
+  color: var(--tone-ok);
+}
+
 .ds-empty {
   display: flex;
   flex-direction: column;

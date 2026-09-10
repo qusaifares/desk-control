@@ -4,6 +4,7 @@ import { DeskMap } from './components/DeskMap.js';
 import { Header } from './components/Header.js';
 import { MonitorEditorSheet } from './components/MonitorEditorSheet.js';
 import { PeripheralPanel } from './components/PeripheralPanel.js';
+import { PresetEditorSheet } from './components/PresetEditorSheet.js';
 import { PresetRail } from './components/PresetRail.js';
 import { QuickActions } from './components/QuickActions.js';
 import { SourcePicker } from './components/SourcePicker.js';
@@ -18,12 +19,19 @@ export function App() {
   const [selectedMonitorId, setSelectedMonitorId] = useState<string | null>(null);
   const [systemOpen, setSystemOpen] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [editingPresetId, setEditingPresetId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   useEffect(
     () => subscribeToDesk({ onSnapshot: setSnapshot, onConnectionChange: setConnection }),
     [],
   );
+
+  const editingPreset = useMemo(() => {
+    if (!snapshot || !editingPresetId) return null;
+    return snapshot.presets.find((preset) => preset.id === editingPresetId) ?? null;
+  }, [snapshot, editingPresetId]);
 
   const selectedMonitor = useMemo<Monitor | null>(() => {
     if (!snapshot || !selectedMonitorId) return null;
@@ -32,14 +40,39 @@ export function App() {
 
   // Every action is a request to the controller. Nothing here mutates desk
   // state locally - the next snapshot is the only source of truth.
-  const run = useCallback(async (action: () => Promise<void>) => {
+  const run = useCallback(async (action: () => Promise<unknown>) => {
     setError(null);
+    setNotice(null);
     try {
       await action();
     } catch (caught) {
       setError((caught as Error).message);
     }
   }, []);
+
+  /**
+   * Saving a preset can partly succeed: a display that cannot be read is left
+   * out rather than guessed, and the user is told which.
+   */
+  const savePreset = useCallback(
+    async (action: () => Promise<{ skipped: Array<{ targetId: string; reason: string }> }>) => {
+      setError(null);
+      setNotice(null);
+      try {
+        const result = await action();
+        if (result.skipped.length > 0) {
+          setNotice(
+            `Saved, but ${result.skipped.length} display${
+              result.skipped.length === 1 ? '' : 's'
+            } could not be read and were left out.`,
+          );
+        }
+      } catch (caught) {
+        setError((caught as Error).message);
+      }
+    },
+    [],
+  );
 
   const pickSource = useCallback(
     (computerId: string) => {
@@ -77,18 +110,23 @@ export function App() {
             onToggleEdit={() => {
               setEditing((current) => !current);
               setSelectedMonitorId(null);
+              setEditingPresetId(null);
             }}
           />
         }
         left={
           <PresetRail
             snapshot={snapshot}
+            editing={editing}
             onApply={(id) => void run(() => deskApi.applyPreset(id))}
+            onEdit={(preset) => setEditingPresetId(preset.id)}
+            onCreate={(name) => void savePreset(() => deskApi.createPreset(name))}
           />
         }
         stage={
           <>
             {error ? <Notice>{error}</Notice> : null}
+            {notice ? <Notice tone="warn">{notice}</Notice> : null}
             <DeskMap
               snapshot={snapshot}
               editing={editing}
@@ -150,6 +188,25 @@ export function App() {
               await deskApi.setWiring(selectedMonitor.id, inputId, created.computerId);
             })
           }
+        />
+      ) : null}
+
+      {editingPreset ? (
+        <PresetEditorSheet
+          snapshot={snapshot}
+          preset={editingPreset}
+          onClose={() => setEditingPresetId(null)}
+          onRename={(customName) =>
+            void run(() => deskApi.rename('preset', editingPreset.id, customName))
+          }
+          onCaptureCurrent={() => {
+            setEditingPresetId(null);
+            void savePreset(() => deskApi.updatePresetToCurrent(editingPreset.id));
+          }}
+          onDelete={() => {
+            setEditingPresetId(null);
+            void run(() => deskApi.deletePreset(editingPreset.id));
+          }}
         />
       ) : null}
 

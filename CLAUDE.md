@@ -44,6 +44,8 @@ anything near providers.
 11. **Local-first.** No cloud service, account, telemetry or internet dependency in the normal path.
     LAN only. Never bind beyond localhost by default.
 12. **Presets are data.** No preset may acquire behaviour or a special-cased application path.
+    Saving one captures OBSERVED state via `captureDeskState()`; anything unreadable is skipped and
+    reported, never guessed.
 
 ## Commands
 

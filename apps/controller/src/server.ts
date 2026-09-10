@@ -2,7 +2,10 @@ import fastifyStatic from '@fastify/static';
 import fastifyWebsocket from '@fastify/websocket';
 import {
   ApplyPresetRequestSchema,
+  CreatePresetRequestSchema,
   DeclareComputerRequestSchema,
+  DeletePresetRequestSchema,
+  UpdatePresetRequestSchema,
   RenameRequestSchema,
   SetMonitorSourceRequestSchema,
   SetMonitorBrightnessRequestSchema,
@@ -177,6 +180,94 @@ export async function createServer(options: {
         .send({ error: { code: 'UNKNOWN_TARGET', message: result.message ?? 'Unknown preset' } });
     }
     return { accepted: true, commandIds: result.commandIds, skipped: result.skipped };
+  });
+
+  app.post('/api/desk/presets/create', async (request, reply) => {
+    const parsed = CreatePresetRequestSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply
+        .status(400)
+        .send({ error: { code: 'INVALID_REQUEST', message: parsed.error.message } });
+    }
+
+    // No assignments means "save what I am looking at". Anything the desk
+    // cannot currently see is left out and reported, never guessed.
+    const captured = parsed.data.assignments ? null : store.captureCurrentDesk();
+    const assignments = parsed.data.assignments ?? captured!.assignments;
+
+    if (
+      Object.keys(assignments.monitorSources).length === 0 &&
+      Object.keys(assignments.peripheralOwners).length === 0
+    ) {
+      return reply.status(409).send({
+        error: {
+          code: 'UNKNOWN_TARGET',
+          message: 'Nothing on the desk can be seen right now, so there is nothing to save.',
+        },
+      });
+    }
+
+    const preset = store.createPreset({
+      detectedName: parsed.data.detectedName,
+      description: parsed.data.description ?? null,
+      icon: parsed.data.icon ?? null,
+      assignments,
+    });
+
+    return {
+      accepted: true,
+      commandIds: [],
+      presetId: preset.id,
+      skipped: (captured?.skipped ?? []).map((skip) => ({
+        targetId: skip.targetId,
+        reason: skip.reason,
+      })),
+    };
+  });
+
+  app.post('/api/desk/presets/update', async (request, reply) => {
+    const parsed = UpdatePresetRequestSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply
+        .status(400)
+        .send({ error: { code: 'INVALID_REQUEST', message: parsed.error.message } });
+    }
+
+    const captured = parsed.data.captureCurrent ? store.captureCurrentDesk() : null;
+    const ok = store.updatePreset(parsed.data.presetId, {
+      ...(captured ? { assignments: captured.assignments } : {}),
+      ...(parsed.data.assignments ? { assignments: parsed.data.assignments } : {}),
+      ...(parsed.data.description !== undefined ? { description: parsed.data.description } : {}),
+      ...(parsed.data.icon !== undefined ? { icon: parsed.data.icon } : {}),
+    });
+    if (!ok) {
+      return reply
+        .status(404)
+        .send({ error: { code: 'UNKNOWN_TARGET', message: 'Unknown preset' } });
+    }
+    return {
+      accepted: true,
+      commandIds: [],
+      skipped: (captured?.skipped ?? []).map((skip) => ({
+        targetId: skip.targetId,
+        reason: skip.reason,
+      })),
+    };
+  });
+
+  app.post('/api/desk/presets/delete', async (request, reply) => {
+    const parsed = DeletePresetRequestSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply
+        .status(400)
+        .send({ error: { code: 'INVALID_REQUEST', message: parsed.error.message } });
+    }
+    if (!store.deletePreset(parsed.data.presetId)) {
+      return reply
+        .status(404)
+        .send({ error: { code: 'UNKNOWN_TARGET', message: 'Unknown preset' } });
+    }
+    return { accepted: true, commandIds: [], skipped: [] };
   });
 
   app.post('/api/desk/name', async (request, reply) => {

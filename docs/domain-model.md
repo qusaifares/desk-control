@@ -153,6 +153,11 @@ should still apply what it can on a four-monitor desk.
 Applying a preset then calls exactly the same `setMonitorSource()` / `setPeripheralOwner()` methods
 that a click on a single monitor calls. There is no second path.
 
+`captureDeskState()` is the inverse: it turns the desk into assignments so a preset can be saved
+from the UI. It reads **observed** state, not desired - "save this" means the arrangement you can
+actually see, not the one that was last requested and may have failed. Anything currently
+unreadable is left out and reported as skipped rather than baked in as a stale assumption.
+
 ## Performance model (designed, not yet enforced)
 
 `MonitorInput.maxMode` records `{ width, height, refreshHz, vrr, bitDepth }` per input, and
