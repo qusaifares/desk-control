@@ -16,6 +16,20 @@ export const PeripheralSchema = NameableSchema.extend({
   switchId: IdSchema,
   /** Which switch channel this peripheral is physically plugged into. */
   channelId: IdSchema.nullable().default(null),
+  /**
+   * USB identity, as `vendor:product` (e.g. "046d:c52b").
+   *
+   * This is what makes peripheral ownership *observable*. A cheap KM switch
+   * reports nothing about which port it is on, so the honest way to know where
+   * the keyboard went is to ask the computers: whichever machine currently
+   * enumerates this device is the one holding it. Without it, ownership can
+   * only ever be inferred from commands we sent, which this system does not do.
+   */
+  usbId: z
+    .string()
+    .regex(/^[0-9a-f]{4}:[0-9a-f]{4}$/i, 'expected vendor:product, e.g. 046d:c52b')
+    .nullable()
+    .default(null),
 });
 export type Peripheral = z.infer<typeof PeripheralSchema>;
 
@@ -41,6 +55,32 @@ export const PeripheralSwitchSchema = NameableSchema.extend({
    * itself (GPIO / serial / USB-HID); an agent id means a computer does it.
    */
   driverBinding: z.union([z.literal('controller'), IdSchema]).default('controller'),
+  /**
+   * How the controller actually operates it.
+   *
+   * `gpio` is the real case: these switches have no software interface, so the
+   * Pi presses the remote's button through a pin. `mode` says whether that
+   * remote has a button per port or one that cycles - which changes everything,
+   * because a cycling remote cannot be moved without knowing where it is.
+   */
+  control: z
+    .discriminatedUnion('kind', [
+      z.object({
+        kind: z.literal('simulated'),
+        switchDelayMs: z.number().int().nonnegative().default(900),
+      }),
+      z.object({
+        kind: z.literal('gpio'),
+        mode: z.enum(['direct', 'cycle']),
+        /** direct: portId -> BCM pin. cycle: one entry, the advance button. */
+        pins: z.record(z.string(), z.number().int().nonnegative()),
+        pulseMs: z.number().int().positive().default(150),
+        settleMs: z.number().int().positive().default(350),
+        driver: z.enum(['pinctrl', 'gpiod']).default('pinctrl'),
+        chip: z.string().default('gpiochip0'),
+      }),
+    ])
+    .default({ kind: 'simulated', switchDelayMs: 900 }),
 });
 export type PeripheralSwitch = z.infer<typeof PeripheralSwitchSchema>;
 

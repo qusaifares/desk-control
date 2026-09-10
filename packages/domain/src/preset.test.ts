@@ -24,6 +24,7 @@ const keyboard: Peripheral = {
   customName: null,
   switchId: 'switch:1',
   channelId: 'default',
+  usbId: null,
 };
 
 describe('planPreset', () => {
@@ -175,6 +176,7 @@ describe('captureDeskState', () => {
         'peripheral:kb': {
           peripheralId: 'peripheral:kb',
           ownerComputerId: 'computer:pc',
+          evidence: 'usb-enumeration' as const,
           reachability: 'reachable',
           observedAt: '2026-01-01T00:00:00.000Z',
           lastError: null,

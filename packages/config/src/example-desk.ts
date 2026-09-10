@@ -380,6 +380,8 @@ export function exampleDeskConfig(): DeskConfig {
         customName: null,
         switchId: EXAMPLE_SWITCH_ID,
         channelId: 'default',
+        // A real Logitech keyboard id, so the simulator exercises the USB path.
+        usbId: '046d:c52b',
       },
       {
         id: EXAMPLE_PERIPHERAL_IDS.mouse,
@@ -388,6 +390,7 @@ export function exampleDeskConfig(): DeskConfig {
         customName: null,
         switchId: EXAMPLE_SWITCH_ID,
         channelId: 'default',
+        usbId: '046d:c077',
       },
     ],
     peripheralSwitches: [
@@ -399,6 +402,7 @@ export function exampleDeskConfig(): DeskConfig {
         capabilities: ['switch-port', 'read-active-port'],
         channels: ['default'],
         driverBinding: 'controller',
+        control: { kind: 'simulated', switchDelayMs: 900 },
         ports: [
           {
             id: 'port-1',

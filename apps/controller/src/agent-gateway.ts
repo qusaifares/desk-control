@@ -144,6 +144,9 @@ export class AgentGateway implements AgentDispatcher {
       }
       case 'agent.observed-state':
         this.store.applyObservedReports(connection.agentId, message.payload.monitors);
+        if (message.payload.usbDevices) {
+          this.store.applyUsbReport(connection.agentId, message.payload.usbDevices);
+        }
         break;
       case 'agent.command-ack':
         this.commandService?.onAgentAck(message.payload.commandId);

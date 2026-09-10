@@ -1,6 +1,6 @@
 import type { ControllerDiscovery } from '@desk-control/discovery';
 import type { ComputerCapability, Platform } from '@desk-control/domain';
-import type { MonitorControlProvider } from '@desk-control/hardware';
+import type { MonitorControlProvider, UsbDeviceProvider } from '@desk-control/hardware';
 import {
   buildMessage,
   parseControllerMessage,
@@ -27,6 +27,12 @@ export interface AgentRuntimeOptions {
   capabilities: ComputerCapability[];
   metadata?: Record<string, string>;
   provider: MonitorControlProvider;
+  /**
+   * Optional. An agent that can enumerate USB reports which devices are
+   * attached, which is what lets the controller see where a shared keyboard
+   * actually went rather than assuming the switch obeyed.
+   */
+  usbProvider?: UsbDeviceProvider;
   discovery: ControllerDiscovery;
   createTransport: () => AgentTransport;
   authToken?: string | null;
@@ -90,6 +96,7 @@ export class AgentRuntime {
     this.connected = false;
     await this.options.discovery.stop();
     await this.options.provider.dispose?.();
+    await this.options.usbProvider?.dispose?.();
   }
 
   private clearTimers(): void {
@@ -165,6 +172,14 @@ export class AgentRuntime {
    * implemented brightness simply never gets asked for it - the controller
    * checks this list before dispatching.
    */
+  private capabilities(): ComputerCapability[] {
+    const capabilities = [...this.options.capabilities];
+    if (this.options.usbProvider && !capabilities.includes('report-usb-devices')) {
+      capabilities.push('report-usb-devices');
+    }
+    return capabilities;
+  }
+
   private supportedCommandKinds(): string[] {
     const kinds = ['set-monitor-input'];
     if (this.options.provider.setBrightness) kinds.push('set-monitor-brightness');
@@ -186,7 +201,7 @@ export class AgentRuntime {
           id: this.options.computerId,
           detectedName: this.options.computerDetectedName,
           platform: this.options.platform,
-          capabilities: this.options.capabilities,
+          capabilities: this.capabilities(),
           metadata: this.options.metadata ?? {},
         },
         monitors: this.monitors,
@@ -289,7 +304,26 @@ export class AgentRuntime {
       });
       return [];
     }
-    this.send(buildMessage('agent.observed-state', { monitors: observed }));
+    // USB is best effort: failing to enumerate must not cost us the monitor
+    // observations, and reporting nothing is different from reporting none.
+    let usbDevices: string[] | undefined;
+    if (this.options.usbProvider) {
+      try {
+        usbDevices = await this.options.usbProvider.listDevices();
+      } catch (error) {
+        this.logger.warn('Failed to list USB devices', {
+          agentId: this.options.agentId,
+          error: (error as Error).message,
+        });
+      }
+    }
+
+    this.send(
+      buildMessage('agent.observed-state', {
+        monitors: observed,
+        ...(usbDevices ? { usbDevices } : {}),
+      }),
+    );
     return observed;
   }
 

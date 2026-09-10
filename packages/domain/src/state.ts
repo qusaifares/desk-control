@@ -72,9 +72,21 @@ export const ObservedMonitorStateSchema = z.object({
 });
 export type ObservedMonitorState = z.infer<typeof ObservedMonitorStateSchema>;
 
+/**
+ * How ownership was determined.
+ *
+ * `usb-enumeration` is a real reading from the machine that has the device.
+ * `switch-report` is the switch's own account of which port it selected, which
+ * many switches simply cannot give. `unknown` means neither was available - and
+ * is reported as such rather than falling back to what we last asked for.
+ */
+export const PeripheralEvidenceSchema = z.enum(['usb-enumeration', 'switch-report', 'unknown']);
+export type PeripheralEvidence = z.infer<typeof PeripheralEvidenceSchema>;
+
 export const ObservedPeripheralStateSchema = z.object({
   peripheralId: IdSchema,
   ownerComputerId: IdSchema.nullable().default(null),
+  evidence: PeripheralEvidenceSchema.default('unknown'),
   reachability: ReachabilitySchema.default('unknown'),
   observedAt: z.string().datetime(),
   lastError: ObservationErrorSchema.nullable().default(null),

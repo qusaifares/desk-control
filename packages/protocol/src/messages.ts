@@ -75,7 +75,17 @@ export const AgentInventorySchema = message(
 
 export const AgentObservedStateSchema = message(
   'agent.observed-state',
-  z.object({ monitors: z.array(ObservedMonitorReportSchema) }),
+  z.object({
+    monitors: z.array(ObservedMonitorReportSchema),
+    /**
+     * USB devices this machine currently enumerates, as `vendor:product`.
+     *
+     * Optional, so an agent that cannot enumerate USB simply omits it rather
+     * than claiming an empty desk. This is how peripheral ownership becomes
+     * observable at all when the switch itself reports nothing.
+     */
+    usbDevices: z.array(z.string()).optional(),
+  }),
 );
 
 export const AgentCommandAckSchema = message(

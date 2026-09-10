@@ -24,6 +24,8 @@ export const ComputerCapabilitySchema = z.enum([
   'power-off',
   'peripheral-switch-control',
   'report-active-display',
+  /** Can list the USB devices currently attached to it. */
+  'report-usb-devices',
 ]);
 export type ComputerCapability = z.infer<typeof ComputerCapabilitySchema>;
 

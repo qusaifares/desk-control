@@ -146,6 +146,7 @@ describe('resolvePeripheralState', () => {
       observed: {
         peripheralId: 'peripheral:kb',
         ownerComputerId: 'computer:a',
+        evidence: 'usb-enumeration' as const,
         reachability: 'reachable',
         observedAt: '2026-01-01T00:00:01.000Z',
         lastError: null,

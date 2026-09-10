@@ -333,10 +333,27 @@ export class CommandService {
     peripheralIds: string[],
   ): Promise<void> {
     this.store.updateCommand(command.id, { status: 'dispatched', attempts: command.attempts + 1 });
+    /*
+     * A remote that only cycles cannot be moved without knowing where it is,
+     * and the only trustworthy answer is observed: which computer currently
+     * enumerates the peripheral. Passing what we last *asked for* would defeat
+     * the point.
+     */
+    const observed = this.store.observedPeripherals()[peripheralIds[0] ?? ''];
+    const currentSwitch = this.store.config.peripheralSwitches.find(
+      (candidate) => candidate.id === payload.switchId,
+    );
+    const currentPortId =
+      observed?.ownerComputerId && observed.evidence !== 'unknown'
+        ? (currentSwitch?.ports.find((port) => port.computerId === observed.ownerComputerId)?.id ??
+          null)
+        : null;
+
     const result = await this.peripheralProvider.setPort({
       switchId: payload.switchId,
       channelId: payload.channelId,
       portId: payload.portId,
+      currentPortId,
       commandId: command.id,
       timeoutMs: this.config.commandTimeoutMs,
     });
@@ -357,6 +374,9 @@ export class CommandService {
       this.store.setObservedPeripheral({
         peripheralId,
         ownerComputerId,
+        // The switch's own account. Overridden by USB evidence when a computer
+        // can actually see the device.
+        evidence: 'switch-report' as const,
         reachability: switchState?.reachability ?? 'unknown',
         observedAt,
         lastError: switchState?.error ?? null,

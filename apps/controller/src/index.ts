@@ -6,13 +6,20 @@ import {
 } from '@desk-control/config';
 import { InMemoryDiscoveryRegistry, NoopControllerAdvertiser } from '@desk-control/discovery';
 import type { ControllerInfo } from '@desk-control/domain';
-import { MockPeripheralSwitchProvider, type SimulatedSwitchSpec } from '@desk-control/hardware';
+import {
+  CompositePeripheralSwitchProvider,
+  GpiodPinDriver,
+  GpioPeripheralSwitchProvider,
+  MockPeripheralSwitchProvider,
+  PinctrlGpioPinDriver,
+  type PeripheralSwitchProvider,
+} from '@desk-control/hardware';
 import { PROTOCOL_VERSION } from '@desk-control/protocol';
 import { mkdir } from 'node:fs/promises';
 import { CommandService } from './command-service.js';
 import { loadControllerConfig } from './config.js';
 import { DeskStore } from './desk-store.js';
-import { createLogger } from './logger.js';
+import { createLogger, type Logger } from './logger.js';
 import { createServer } from './server.js';
 
 const CONTROLLER_VERSION = '0.1.0';
@@ -22,20 +29,54 @@ const CONTROLLER_VERSION = '0.1.0';
  * USB-HID on the Pi). Only the simulator exists today; the spec below is
  * derived from user config so nothing about the switch is hardcoded.
  */
-function switchSpecsFromConfig(config: DeskConfig): SimulatedSwitchSpec[] {
-  return config.peripheralSwitches.map((peripheralSwitch) => {
+function buildPeripheralProvider(config: DeskConfig, logger: Logger): PeripheralSwitchProvider {
+  const bySwitch = new Map<string, PeripheralSwitchProvider>();
+
+  for (const peripheralSwitch of config.peripheralSwitches) {
     const ports = peripheralSwitch.ports.map((port) => port.id);
-    const firstPort = ports[0] ?? 'port-1';
-    return {
-      switchId: peripheralSwitch.id,
-      channels: peripheralSwitch.channels,
-      ports,
-      initialPorts: Object.fromEntries(
-        peripheralSwitch.channels.map((channelId) => [channelId, firstPort]),
-      ),
-      switchDelayMs: 900,
-    };
-  });
+
+    if (peripheralSwitch.control.kind === 'gpio') {
+      const control = peripheralSwitch.control;
+      const pins =
+        control.driver === 'gpiod' ? new GpiodPinDriver(control.chip) : new PinctrlGpioPinDriver();
+
+      bySwitch.set(
+        peripheralSwitch.id,
+        new GpioPeripheralSwitchProvider(
+          {
+            switchId: peripheralSwitch.id,
+            channels: peripheralSwitch.channels,
+            mode: control.mode,
+            pins: control.pins,
+            portOrder: ports,
+            pulseMs: control.pulseMs,
+            settleMs: control.settleMs,
+          },
+          pins,
+        ),
+      );
+      logger.info(
+        { switchId: peripheralSwitch.id, mode: control.mode, driver: control.driver },
+        'Peripheral switch driven over GPIO',
+      );
+      continue;
+    }
+
+    const simulated = new MockPeripheralSwitchProvider([
+      {
+        switchId: peripheralSwitch.id,
+        channels: peripheralSwitch.channels,
+        ports,
+        initialPorts: Object.fromEntries(
+          peripheralSwitch.channels.map((channelId) => [channelId, ports[0] ?? 'port-1']),
+        ),
+        switchDelayMs: peripheralSwitch.control.switchDelayMs,
+      },
+    ]);
+    bySwitch.set(peripheralSwitch.id, simulated);
+  }
+
+  return new CompositePeripheralSwitchProvider(bySwitch);
 }
 
 /**
@@ -76,7 +117,7 @@ async function main(): Promise<void> {
     startedAt: new Date().toISOString(),
   };
 
-  const peripheralProvider = new MockPeripheralSwitchProvider(switchSpecsFromConfig(deskConfig));
+  const peripheralProvider = buildPeripheralProvider(deskConfig, logger);
 
   // Seed peripheral observations so the UI shows real hardware truth at boot
   // rather than an optimistic guess.
@@ -91,6 +132,7 @@ async function main(): Promise<void> {
         peripheralId: peripheral.id,
         ownerComputerId:
           peripheralSwitch?.ports.find((port) => port.id === portId)?.computerId ?? null,
+        evidence: 'switch-report',
         reachability: state.reachability,
         observedAt: new Date().toISOString(),
         lastError: state.error,

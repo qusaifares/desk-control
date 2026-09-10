@@ -1,7 +1,11 @@
 import { AgentRuntime, WebSocketAgentTransport } from '@desk-control/agent-core';
-import { EXAMPLE_COMPUTERS, EXAMPLE_MONITOR_SPECS } from '@desk-control/config';
+import { EXAMPLE_COMPUTERS, EXAMPLE_MONITOR_SPECS, exampleDeskConfig } from '@desk-control/config';
 import { StaticControllerDiscovery } from '@desk-control/discovery';
-import { MockMonitorControlProvider, SimulatedDesk } from '@desk-control/hardware';
+import {
+  MockMonitorControlProvider,
+  SimulatedDesk,
+  StaticUsbDeviceProvider,
+} from '@desk-control/hardware';
 import { PROTOCOL_VERSION } from '@desk-control/protocol';
 import Fastify from 'fastify';
 import pino from 'pino';
@@ -60,12 +64,35 @@ interface SimulatedAgent {
   agentId: string;
   name: string;
   runtime: AgentRuntime;
+  usb: StaticUsbDeviceProvider;
   running: boolean;
 }
+
+/*
+ * Simulated USB world.
+ *
+ * A shared keyboard exists on exactly one machine at a time, and the switch
+ * physically moves it. Modelling that matters: the controller now works out
+ * ownership by asking which computer enumerates the device, so a simulator that
+ * skipped this would exercise none of that path - and would quietly look
+ * broken, because no machine would ever claim the keyboard.
+ */
+const SHARED_USB_IDS = exampleDeskConfig()
+  .peripherals.map((peripheral) => peripheral.usbId)
+  .filter((id): id is string => id !== null);
+
+/** Devices every simulated machine has of its own, so the list is never bare. */
+const LOCAL_USB_IDS = ['1d6b:0002', '05e3:0608'];
 
 const agents: SimulatedAgent[] = EXAMPLE_COMPUTERS.map((computer) => {
   const agentId = computer.id.replace(/^computer:/, 'agent:');
   const agentLogger = logger.child({ agent: computer.detectedName });
+  const usb = new StaticUsbDeviceProvider([
+    ...LOCAL_USB_IDS,
+    // The desk starts with the shared peripherals on the first switch port.
+    ...(computer.id === EXAMPLE_COMPUTERS[0]!.id ? SHARED_USB_IDS : []),
+  ]);
+
   const runtime = new AgentRuntime({
     agentId,
     computerId: computer.id,
@@ -76,6 +103,7 @@ const agents: SimulatedAgent[] = EXAMPLE_COMPUTERS.map((computer) => {
     capabilities: computer.capabilities,
     metadata: computer.metadata,
     provider: new MockMonitorControlProvider(desk, computer.id),
+    usbProvider: usb,
     discovery: new StaticControllerDiscovery([endpoint]),
     createTransport: () => new WebSocketAgentTransport(),
     authToken: env.DESK_CONTROL_PAIRING_TOKEN || null,
@@ -86,7 +114,14 @@ const agents: SimulatedAgent[] = EXAMPLE_COMPUTERS.map((computer) => {
       error: (message, context) => agentLogger.error(context ?? {}, message),
     },
   });
-  return { computerId: computer.id, agentId, name: computer.detectedName, runtime, running: false };
+  return {
+    computerId: computer.id,
+    agentId,
+    name: computer.detectedName,
+    runtime,
+    usb,
+    running: false,
+  };
 });
 
 async function startAgent(agent: SimulatedAgent): Promise<void> {
@@ -101,6 +136,36 @@ async function stopAgent(agent: SimulatedAgent): Promise<void> {
   agent.running = false;
   await agent.runtime.stop();
   logger.warn({ agent: agent.name }, 'Simulated agent stopped (hardware left untouched)');
+}
+
+/**
+ * Follows the controller's requested peripheral owner and physically moves the
+ * simulated devices, the way the switch would. Deliberately lagging: the
+ * controller should be seen to wait for the hardware, not to assume it.
+ */
+async function trackPeripheralOwner(): Promise<void> {
+  try {
+    const response = await fetch(
+      env.DESK_CONTROL_URL.replace(/^ws/, 'http').replace('/agent', '/api/desk'),
+    );
+    if (!response.ok) return;
+    const snapshot = (await response.json()) as {
+      desired: { peripheralOwners: Record<string, { ownerComputerId: string }> };
+    };
+
+    const owners = new Set(
+      Object.values(snapshot.desired.peripheralOwners ?? {}).map((entry) => entry.ownerComputerId),
+    );
+    if (owners.size !== 1) return;
+    const target = [...owners][0]!;
+
+    for (const agent of agents) {
+      const shouldHold = agent.computerId === target;
+      agent.usb.setDevices([...LOCAL_USB_IDS, ...(shouldHold ? SHARED_USB_IDS : [])]);
+    }
+  } catch {
+    // The controller may not be up yet; the next tick tries again.
+  }
 }
 
 const control = Fastify({ logger: false });
@@ -178,6 +243,9 @@ async function main(): Promise<void> {
   );
 
   for (const agent of agents) await startAgent(agent);
+
+  // Slower than the switch itself, so "switching" is visible in the UI.
+  setInterval(() => void trackPeripheralOwner(), 1500);
 
   logger.info(
     `Stop an agent with: curl -XPOST http://${env.MOCK_DESK_HOST}:${env.MOCK_DESK_PORT}/agents/agent:gaming-pc/stop`,

@@ -60,6 +60,8 @@ export class DeskStore {
   /** monitorId -> agentId -> latest observation from that agent. */
   private readonly observations = new Map<string, Map<string, ObservationRecord>>();
   private readonly peripheralObservations = new Map<string, ObservedPeripheralState>();
+  /** computerId -> USB devices that machine currently enumerates. */
+  private readonly usbByComputer = new Map<string, Set<string>>();
   /**
    * Best belief about which input is live on each monitor.
    *
@@ -466,13 +468,117 @@ export class DeskStore {
     return result;
   }
 
+  /**
+   * Records what USB devices a machine can see.
+   *
+   * This is the evidence behind peripheral ownership. A KM switch of the usual
+   * sort cannot say which port it selected, so the only real answer to "where
+   * is the keyboard?" is which computer currently enumerates it.
+   */
+  applyUsbReport(agentId: string, devices: readonly string[]): void {
+    const agent = this.agents.get(agentId);
+    if (!agent) return;
+    this.usbByComputer.set(agent.computerId, new Set(devices.map((id) => id.toLowerCase())));
+    this.touch();
+  }
+
+  /**
+   * Which online computer holds a given USB device.
+   *
+   * Only online agents count: a machine that has gone quiet cannot vouch for
+   * what is still plugged into it. Two machines claiming the same id - two
+   * identical keyboards, or a hub - is ambiguous, and ambiguous is reported as
+   * unknown rather than resolved by picking one.
+   */
+  private usbHolderOf(usbId: string): { computerId: string | null; ambiguous: boolean } {
+    const wanted = usbId.toLowerCase();
+    const holders = [...this.usbByComputer.entries()]
+      .filter(([computerId, devices]) => {
+        const computer = this.computers.get(computerId);
+        const agentId = computer?.agentId;
+        return (
+          devices.has(wanted) &&
+          agentId !== null &&
+          agentId !== undefined &&
+          this.isAgentOnline(agentId)
+        );
+      })
+      .map(([computerId]) => computerId);
+
+    if (holders.length === 1) return { computerId: holders[0]!, ambiguous: false };
+    return { computerId: null, ambiguous: holders.length > 1 };
+  }
+
+  /** True once at least one online agent has told us what it can see. */
+  private hasUsbEvidence(): boolean {
+    for (const [computerId] of this.usbByComputer) {
+      const agentId = this.computers.get(computerId)?.agentId;
+      if (agentId && this.isAgentOnline(agentId)) return true;
+    }
+    return false;
+  }
+
   setObservedPeripheral(state: ObservedPeripheralState): void {
     this.peripheralObservations.set(state.peripheralId, state);
     this.touch();
   }
 
+  /**
+   * Peripheral ownership, preferring what the computers report over what the
+   * switch claims.
+   *
+   * A switch that can read its own port is still useful as a fallback, but USB
+   * enumeration is a reading of the actual outcome rather than an account of
+   * the action, so it wins wherever it is available.
+   */
   observedPeripherals(): Record<string, ObservedPeripheralState> {
-    return Object.fromEntries(this.peripheralObservations);
+    const result: Record<string, ObservedPeripheralState> = {};
+    const observedAt = new Date().toISOString();
+
+    for (const peripheral of this.config.peripherals) {
+      const fromSwitch = this.peripheralObservations.get(peripheral.id);
+
+      if (peripheral.usbId && this.hasUsbEvidence()) {
+        const holder = this.usbHolderOf(peripheral.usbId);
+        result[peripheral.id] = {
+          peripheralId: peripheral.id,
+          ownerComputerId: holder.computerId,
+          evidence: holder.computerId ? 'usb-enumeration' : 'unknown',
+          reachability: holder.computerId ? 'reachable' : 'unknown',
+          observedAt,
+          lastError: holder.ambiguous
+            ? {
+                code: 'AMBIGUOUS',
+                message: `More than one computer reports USB ${peripheral.usbId}`,
+              }
+            : null,
+        };
+        continue;
+      }
+
+      if (fromSwitch) {
+        result[peripheral.id] = fromSwitch;
+        continue;
+      }
+
+      // Neither the computers nor the switch can tell us. Say so explicitly
+      // rather than omitting the peripheral, so the UI shows "unknown" instead
+      // of quietly having nothing to render.
+      result[peripheral.id] = {
+        peripheralId: peripheral.id,
+        ownerComputerId: null,
+        evidence: 'unknown',
+        reachability: 'unknown',
+        observedAt,
+        lastError: null,
+      };
+    }
+
+    // Anything observed but no longer in config still gets reported as-is.
+    for (const [peripheralId, state] of this.peripheralObservations) {
+      if (!result[peripheralId]) result[peripheralId] = state;
+    }
+    return result;
   }
 
   /* ---------------------------------------------------------------- *

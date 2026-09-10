@@ -176,6 +176,21 @@ function Get-EdidBlocks {
   return $blocks
 }
 
+function Get-UsbDevices {
+  # Identity only - which devices are attached, never anything they send.
+  $ids = @{}
+  try {
+    foreach ($d in (Get-CimInstance Win32_PnPEntity -Filter "DeviceID LIKE 'USB%'" -ErrorAction Stop)) {
+      if ($d.DeviceID -match 'VID_([0-9A-Fa-f]{4})&PID_([0-9A-Fa-f]{4})') {
+        $ids[("{0}:{1}" -f $matches[1].ToLower(), $matches[2].ToLower())] = $true
+      }
+    }
+  } catch {
+    # Nothing to report is reported as nothing, not as an empty desk.
+  }
+  return @($ids.Keys)
+}
+
 function Find-Display {
   param([string]$DeviceId)
   foreach ($d in (Get-Displays)) {
@@ -264,6 +279,7 @@ while ($true) {
     switch ($request.op) {
       'ping'    { Write-Response ([pscustomobject]@{ id = $id; ok = $true; result = [pscustomobject]@{ pong = $true } }) }
       'list'    { Write-Response ([pscustomobject]@{ id = $id; ok = $true; result = (Invoke-List) }) }
+      'usb'     { Write-Response ([pscustomobject]@{ id = $id; ok = $true; result = [pscustomobject]@{ devices = @(Get-UsbDevices) } }) }
       'observe' { Write-Response ([pscustomobject]@{ id = $id; ok = $true; result = (Invoke-Observe) }) }
       'getvcp'  {
         $display = Find-Display -DeviceId $request.deviceId

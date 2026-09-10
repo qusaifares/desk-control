@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { DdcMonitorControlProvider } from '../../ddc/ddc-provider.js';
 import { JsonLineProcessBridge, toWindowsPath } from '../../ddc/process-bridge.js';
 import type { DdcBridge } from '../../ddc/types.js';
+import { normalizeUsbId, type UsbDeviceProvider } from '../../usb-device-provider.js';
 import { DDC_BRIDGE_SCRIPT } from './ddc-bridge-script.js';
 
 /**
@@ -42,6 +43,27 @@ export function createWindowsDdcBridge(): DdcBridge {
       };
     },
   });
+}
+
+/**
+ * USB enumeration over the same helper process the DDC provider uses.
+ *
+ * Sharing the process rather than spawning a second PowerShell: the expensive
+ * part is startup, and this is one more line request on a pipe that is already
+ * open.
+ */
+export class WindowsUsbDeviceProvider implements UsbDeviceProvider {
+  readonly kind = 'windows-pnp';
+
+  constructor(private readonly bridge: DdcBridge) {}
+
+  async listDevices(): Promise<string[]> {
+    const result = await this.bridge.request<{ devices: string[] }>('usb', {}, 15_000);
+    const devices = Array.isArray(result.devices) ? result.devices : [];
+    return [
+      ...new Set(devices.map((id) => normalizeUsbId(id)).filter((id): id is string => !!id)),
+    ].sort();
+  }
 }
 
 export interface WindowsDdcProviderOptions {

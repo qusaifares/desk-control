@@ -152,6 +152,12 @@ supersede an in-flight input switch on the same monitor.
   route commands via `selectControlPath()`.
 - **A single-channel USB switch moves every peripheral at once.** `setPeripheralOwner` updates every
   peripheral on that channel and collapses onto one command.
+- **A KM switch cannot report its port.** Ownership is observed by asking the computers which of them
+  enumerates the peripheral's `usbId`, never by counting button presses. `ObservedPeripheralState`
+  carries `evidence` saying which it was; `unknown` is a real answer and must not be replaced with
+  the last thing we asked for.
+- **A cycling remote refuses to move without an observed current position.** Pressing hopefully and
+  counting would desync silently and stay wrong.
 - **Wiring is discovered** from `connectedViaInputId`. `wiringOverrides` in config is only for inputs
   no agent can report.
 - Hardware facts are **never persisted**. Config holds user intent and labels only, and it is
