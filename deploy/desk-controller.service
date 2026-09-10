@@ -1,0 +1,33 @@
+# Desk controller.
+#
+# Runs on the Raspberry Pi and serves the web UI itself, so the panel is one
+# process and one port. Agents on the desk's computers dial in to it.
+[Unit]
+Description=Desk Control controller
+Documentation=https://github.com/qusaifares/desk-control
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=%i
+WorkingDirectory=/opt/desk-control
+EnvironmentFile=/etc/desk-control.env
+ExecStart=/usr/bin/node /opt/desk-control/apps/controller/dist/index.js
+Restart=always
+RestartSec=3
+
+# Fail passive: stopping the controller must never move the desk. There is no
+# cleanup on shutdown by design, so a plain SIGTERM is all that is wanted.
+KillSignal=SIGTERM
+TimeoutStopSec=10
+
+# The controller only ever needs its own data directory.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=read-only
+ReadWritePaths=/var/lib/desk-control
+
+[Install]
+WantedBy=multi-user.target

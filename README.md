@@ -128,6 +128,7 @@ docs/
 - [docs/protocol.md](docs/protocol.md) — wire protocol, versioning, errors, security roadmap
 - [docs/hardware.md](docs/hardware.md) — control plane vs data plane, DDC/CI realities
 - [docs/development.md](docs/development.md) — environment, workflows, simulator control API
+- [docs/raspberry-pi.md](docs/raspberry-pi.md) — running the panel on a Pi: install, kiosk, display
 - [docs/design-system.md](docs/design-system.md) — tokens, primitives, and how to build a new screen
 - [CLAUDE.md](CLAUDE.md) — invariants and conventions for future work in this repo
 

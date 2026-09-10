@@ -1,0 +1,28 @@
+# Chromium in kiosk mode, pointed at the local controller.
+#
+# A user service so it runs inside the graphical session that owns the display.
+# Enable with:  systemctl --user enable --now desk-kiosk
+[Unit]
+Description=Desk Control kiosk browser
+After=graphical-session.target
+PartOf=graphical-session.target
+
+[Service]
+Type=simple
+Environment=DISPLAY=:0
+ExecStartPre=/bin/sh -c 'until curl -sf http://127.0.0.1:7420/api/health >/dev/null; do sleep 1; done'
+ExecStart=/usr/bin/chromium-browser \
+  --kiosk \
+  --app=http://127.0.0.1:7420/ \
+  --noerrdialogs \
+  --disable-infobars \
+  --disable-features=TranslateUI \
+  --check-for-update-interval=31536000 \
+  --disable-pinch \
+  --overscroll-history-navigation=0 \
+  --autoplay-policy=no-user-gesture-required
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=graphical-session.target

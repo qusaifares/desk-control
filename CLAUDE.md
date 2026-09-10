@@ -192,7 +192,18 @@ as well as native Windows, which is how it is tested.
 `pnpm --filter @desk-control/agent exec tsx src/index.ts probe` enumerates the real monitors on the
 current machine without changing anything.
 
+## Raspberry Pi
+
+The Pi is the control plane host: it runs the controller, serves the UI, and will drive the USB
+switch over GPIO. It does not run an agent - it has no monitors of its own.
+
+`scripts/install-pi.sh` builds, installs a systemd service and generates a pairing token.
+`docs/raspberry-pi.md` covers the display mode and kiosk browser. The panel is 1920x440.
+
+This is the first time the controller binds beyond localhost, because agents have to reach it. The
+installer therefore generates a pairing token rather than leaving it open. Be honest about what that
+is: a shared secret over plain HTTP on a trusted LAN. Never forward the port.
+
 ## Out of scope for now
 
-Cloud, accounts, remote access, audio switching, power management, Pi GPIO, production installers,
-polished animations.
+Cloud, accounts, remote access, audio switching, computer power management, polished animations.

@@ -214,6 +214,8 @@ DESK_CONTROL_DATA_DIR=.data-real pnpm --filter @desk-control/controller exec tsx
 
 ## Raspberry Pi notes
 
+See [raspberry-pi.md](raspberry-pi.md) for the full install, kiosk and display setup.
+
 The controller is deliberately dependency-light and free of native modules, so ARM64 needs no special
 handling. For a single-process deployment, build the web UI and point the controller at it:
 
