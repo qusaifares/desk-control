@@ -20,22 +20,27 @@ This is a working **architectural bootstrap with a complete vertical slice**, no
 product. Everything below the UI is real — real HTTP, real WebSockets, a real versioned protocol, a
 real command lifecycle — but the hardware underneath is simulated.
 
-| Area                                                                   | State                                                   |
-| ---------------------------------------------------------------------- | ------------------------------------------------------- |
-| Domain model, identity, capabilities                                   | Implemented                                             |
-| Desired vs observed state, reconciliation                              | Implemented                                             |
-| Versioned agent protocol with runtime validation                       | Implemented                                             |
-| Controller: registry, command lifecycle, timeouts, supersession        | Implemented                                             |
-| Agent runtime: registration, heartbeat, idempotent commands, reconnect | Implemented                                             |
-| Presets as data, applied through the normal command path               | Implemented                                             |
-| Web UI: desk map, source picker, presets, peripherals, connectivity    | Implemented (minimal design)                            |
-| Monitor control provider abstraction                                   | Implemented                                             |
-| Mock provider + shared simulated desk                                  | Implemented                                             |
-| **Windows DDC/CI, macOS DDC, Linux ddcutil**                           | **Not implemented — stubs that throw**                  |
-| Real USB switch / GPIO control                                         | Not implemented — simulated                             |
-| mDNS discovery                                                         | Interface defined, static discovery in use              |
-| Pairing / authentication                                               | Optional shared token; full pairing designed, not built |
-| Audio, power management, Pi packaging                                  | Not started                                             |
+| Area                                                                         | State                                                 |
+| ---------------------------------------------------------------------------- | ----------------------------------------------------- |
+| Domain model, identity, capabilities                                         | Implemented                                           |
+| Desired vs observed state, reconciliation                                    | Implemented                                           |
+| Versioned agent protocol with runtime validation                             | Implemented                                           |
+| Controller: registry, command lifecycle, timeouts, supersession, retries     | Implemented                                           |
+| Agent runtime: registration, heartbeat, idempotent commands, reconnect       | Implemented                                           |
+| Presets as data, created and edited from the UI                              | Implemented                                           |
+| Web UI and design system                                                     | Implemented                                           |
+| Configure the desk from the UI: rename, arrange, declare wiring and machines | Implemented                                           |
+| Crash recovery, durable config writes, command retries                       | Implemented                                           |
+| **Windows DDC/CI**: discovery, EDID identity, capabilities, input switching  | **Implemented, verified on real monitors**            |
+| **Monitor brightness and display power**                                     | **Implemented, verified on real monitors**            |
+| **Peripheral ownership observed from USB enumeration**                       | **Implemented, verified on Windows**                  |
+| macOS DDC                                                                    | Implemented, **not yet verified on a Mac**            |
+| USB switch control over GPIO                                                 | Implemented, **not yet wired to hardware**            |
+| Raspberry Pi deployment: service, kiosk, installer                           | Implemented, **not yet run on a Pi**                  |
+| Linux ddcutil provider                                                       | Not implemented — stub that throws                    |
+| mDNS discovery                                                               | Interface defined; static discovery in use            |
+| Pairing / authentication                                                     | Shared token only; per-agent keys designed, not built |
+| Audio switching, computer power (Wake-on-LAN, sleep)                         | Not started                                           |
 
 ## Architecture at a glance
 
