@@ -21,6 +21,10 @@ const EnvSchema = z.object({
   DESK_CONTROL_OBSERVE_INTERVAL_MS: z.coerce.number().int().positive().default(3_000),
   /** An agent is considered offline after this long without a frame. */
   DESK_CONTROL_AGENT_TIMEOUT_MS: z.coerce.number().int().positive().default(15_000),
+  /** How long to wait before retrying a command that failed retryably. */
+  DESK_CONTROL_RETRY_DELAY_MS: z.coerce.number().int().positive().default(1_500),
+  /** Total attempts per command, including the first. 1 disables retrying. */
+  DESK_CONTROL_MAX_ATTEMPTS: z.coerce.number().int().positive().default(3),
   /** Optional path to a built web bundle to serve from the controller. */
   DESK_CONTROL_WEB_DIR: z.string().optional(),
 });
@@ -36,6 +40,8 @@ export interface ControllerConfig {
   heartbeatIntervalMs: number;
   observeIntervalMs: number;
   agentTimeoutMs: number;
+  retryDelayMs: number;
+  maxAttempts: number;
   webDir: string | null;
 }
 
@@ -53,6 +59,8 @@ export function loadControllerConfig(env: NodeJS.ProcessEnv = process.env): Cont
     heartbeatIntervalMs: parsed.DESK_CONTROL_HEARTBEAT_INTERVAL_MS,
     observeIntervalMs: parsed.DESK_CONTROL_OBSERVE_INTERVAL_MS,
     agentTimeoutMs: parsed.DESK_CONTROL_AGENT_TIMEOUT_MS,
+    retryDelayMs: parsed.DESK_CONTROL_RETRY_DELAY_MS,
+    maxAttempts: parsed.DESK_CONTROL_MAX_ATTEMPTS,
     webDir: parsed.DESK_CONTROL_WEB_DIR ? resolve(parsed.DESK_CONTROL_WEB_DIR) : null,
   };
 }

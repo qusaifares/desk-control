@@ -161,7 +161,15 @@ supersede an in-flight input switch on the same monitor.
 - **Wiring is discovered** from `connectedViaInputId`. `wiringOverrides` in config is only for inputs
   no agent can report.
 - Hardware facts are **never persisted**. Config holds user intent and labels only, and it is
-  written as it changes (debounced), not on shutdown - a Pi loses power without warning.
+  written as it changes (debounced), not on shutdown - a Pi loses power without warning. The write
+  is fsynced and keeps a `.bak`, because atomic is not the same as durable on an SD card.
+- **`retryable` is acted on.** A retryable failure is retried up to `maxAttempts`, keeping the same
+  command id - it is the same intent still being pursued, so the UI keeps showing "switching".
+  Reusing the id is safe because providers cache only _successful_ outcomes; caching a failure would
+  make every retry return the same stale no. Superseding must cancel a pending retry as well as an
+  in-flight command, or an abandoned attempt will fire later and fight the newer one.
+- **The UI has an error boundary** and it matters: the panel has no keyboard, so a render crash used
+  to mean a power cycle. It auto-reloads once, never twice - a reload loop destroys the evidence.
 - A computer does not need an agent to be routable. `manualComputers` plus `wiringOverrides` let the
   user declare a console or an un-instrumented laptop, and the switch is carried out by whichever
   agent holds DDC access to that monitor.

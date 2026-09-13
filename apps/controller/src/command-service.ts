@@ -68,6 +68,7 @@ interface IssuePeripheralArgs {
  */
 export class CommandService {
   private readonly timers = new Map<string, NodeJS.Timeout>();
+  private readonly retryTimers = new Map<string, NodeJS.Timeout>();
 
   constructor(
     private readonly store: DeskStore,
@@ -484,6 +485,7 @@ export class CommandService {
           retryable: error?.retryable ?? false,
         },
       });
+      if (error?.retryable) this.scheduleRetry(commandId);
     }
   }
 
@@ -518,6 +520,16 @@ export class CommandService {
   dispose(): void {
     for (const timer of this.timers.values()) clearTimeout(timer);
     this.timers.clear();
+    for (const timer of this.retryTimers.values()) clearTimeout(timer);
+    this.retryTimers.clear();
+  }
+
+  private clearRetry(commandId: string): void {
+    const timer = this.retryTimers.get(commandId);
+    if (timer) {
+      clearTimeout(timer);
+      this.retryTimers.delete(commandId);
+    }
   }
 
   /* ---------------------------------------------------------------- *
@@ -556,15 +568,28 @@ export class CommandService {
     );
   }
 
-  /** A newer request for the same target retires the older one. */
+  /**
+   * A newer request for the same target retires the older one.
+   *
+   * Including one that has already failed and is only waiting to retry. Those
+   * are not "in flight", but their timer is still armed - and a retry that
+   * fires after the user has asked for something else will happily drive the
+   * monitor back to the abandoned target.
+   */
   private supersede(targetKey: string): void {
-    const stale = this.findInFlightForTarget(targetKey);
-    if (!stale) return;
-    this.clearTimer(stale.id);
-    this.store.updateCommand(stale.id, {
-      status: 'superseded',
-      error: { code: 'SUPERSEDED', message: 'Replaced by a newer request', retryable: false },
-    });
+    for (const candidate of this.store.commands.values()) {
+      if (commandTargetKey(candidate.payload) !== targetKey) continue;
+
+      const awaitingRetry = this.retryTimers.has(candidate.id);
+      if (!isInFlight(candidate.status) && !awaitingRetry) continue;
+
+      this.clearTimer(candidate.id);
+      this.clearRetry(candidate.id);
+      this.store.updateCommand(candidate.id, {
+        status: 'superseded',
+        error: { code: 'SUPERSEDED', message: 'Replaced by a newer request', retryable: false },
+      });
+    }
   }
 
   private dispatch(command: DeskCommand, agentId: string): void {
@@ -605,6 +630,7 @@ export class CommandService {
         },
       });
       this.logger.warn({ commandId: command.id, agentId }, 'Command timed out');
+      this.scheduleRetry(command.id);
     }, this.config.commandTimeoutMs);
 
     this.timers.set(command.id, timer);
@@ -620,6 +646,94 @@ export class CommandService {
       error: { ...error, code: toProtocolErrorCode(error.code) },
     });
     this.logger.warn({ commandId, ...error }, 'Command failed');
+    if (error.retryable) this.scheduleRetry(commandId);
+  }
+
+  /**
+   * Retries a command whose failure said it was worth retrying.
+   *
+   * DDC is genuinely flaky - a panel mid-resync, a busy bus, an agent that just
+   * lost the input - and until now `retryable` was written on every error and
+   * read by nothing, so a transient blip was indistinguishable from a permanent
+   * one and stayed failed until someone tapped again.
+   *
+   * The command keeps its identity and its id: it is the same intent, still
+   * being pursued, so the UI keeps showing "switching" rather than flickering
+   * through failed and back. The id is safe to reuse because providers only
+   * cache *successful* outcomes.
+   */
+  private scheduleRetry(commandId: string): void {
+    const command = this.store.commands.get(commandId);
+    if (!command) return;
+    if (command.attempts >= this.config.maxAttempts) {
+      this.logger.warn({ commandId, attempts: command.attempts }, 'Giving up after the last retry');
+      return;
+    }
+    if (this.retryTimers.has(commandId)) return;
+
+    const timer = setTimeout(() => {
+      this.retryTimers.delete(commandId);
+      void this.retry(commandId);
+    }, this.config.retryDelayMs);
+    this.retryTimers.set(commandId, timer);
+  }
+
+  private async retry(commandId: string): Promise<void> {
+    const command = this.store.commands.get(commandId);
+    // Only a command still sitting in failure gets another go. Anything else -
+    // superseded by a newer request, or somehow already in flight - is not ours
+    // to restart.
+    if (!command) return;
+    if (command.status !== 'failed' && command.status !== 'timed-out') return;
+
+    this.logger.info(
+      { commandId, attempt: command.attempts + 1, of: this.config.maxAttempts },
+      'Retrying command',
+    );
+
+    this.store.updateCommand(commandId, {
+      status: 'pending',
+      error: null,
+      deadlineAt: new Date(Date.now() + this.config.commandTimeoutMs).toISOString(),
+    });
+
+    if (command.payload.kind === 'set-peripheral-owner') {
+      await this.executePeripheralCommand(
+        this.store.commands.get(commandId)!,
+        command.payload,
+        command.payload.peripheralIds,
+      );
+      return;
+    }
+
+    const monitor = this.store.monitors.get(command.payload.monitorId);
+    if (!monitor) {
+      this.failCommand(commandId, {
+        code: 'UNKNOWN_TARGET',
+        message: 'Monitor is no longer on the desk',
+        retryable: false,
+      });
+      return;
+    }
+
+    // Re-select the path: the reason it failed may be that the live input moved.
+    const path = selectControlPath(monitor, {
+      activeInputId: this.store.bestKnownActiveInput(monitor.id),
+      isAgentOnline: (agentId) =>
+        this.dispatcher.isOnline(agentId) &&
+        this.store.agentSupportsCommand(agentId, command.payload.kind),
+    });
+
+    if (!path) {
+      this.failCommand(commandId, {
+        code: 'NO_CONTROL_PATH',
+        message: 'No online agent can reach this monitor right now.',
+        retryable: true,
+      });
+      return;
+    }
+
+    this.dispatch(this.store.commands.get(commandId)!, path.agentId);
   }
 
   private clearTimer(commandId: string): void {

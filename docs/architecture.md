@@ -124,6 +124,13 @@ sequenceDiagram
 The controller never writes an observation. An agent never reports the value it just asked for — it
 reads the hardware back. If the read says the panel did not move, the UI says so.
 
+A failure that reports itself as retryable is retried, up to `maxAttempts`, under the **same command
+id** — it is the same intent still being pursued, so the UI keeps showing `switching` rather than
+flickering through `failed` and back. DDC is flaky enough in practice (a panel mid-resync, a busy
+bus, an agent that just lost the input) that treating every blip as final made the desk feel broken
+when it was merely slow. A newer request for the same target cancels any pending retry, so an
+abandoned attempt cannot fire later and drive the monitor back.
+
 ## Desired vs observed
 
 ```mermaid

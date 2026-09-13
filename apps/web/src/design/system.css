@@ -625,6 +625,42 @@ button.ds-tile:active:not(:disabled) {
   cursor: not-allowed;
 }
 
+/* ---------- crash screen ---------- */
+
+.ds-crash {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-5);
+  padding: var(--space-7);
+  text-align: center;
+}
+
+.ds-crash-title {
+  font-size: var(--text-xl);
+  font-weight: var(--weight-bold);
+}
+
+.ds-crash-body {
+  max-width: 46ch;
+  color: var(--text-secondary);
+}
+
+.ds-crash-detail {
+  max-width: 100%;
+  overflow-x: auto;
+  margin: 0;
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--tone-bad-border);
+  background: var(--tone-bad-soft);
+  color: var(--tone-bad);
+  font-size: var(--text-sm);
+  text-align: left;
+}
+
 /* ---------- swatches ---------- */
 
 .ds-swatch-row {

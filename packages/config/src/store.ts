@@ -1,4 +1,4 @@
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, open, readFile, rename } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { migrateDeskConfig } from './migrate.js';
 import { DeskConfigSchema, type DeskConfig } from './schema.js';
@@ -23,39 +23,100 @@ export interface ConfigStore {
 export class JsonFileConfigStore implements ConfigStore {
   constructor(private readonly filePath: string) {}
 
+  private get backupPath(): string {
+    return `${this.filePath}.bak`;
+  }
+
   async load(): Promise<DeskConfig | null> {
+    const primary = await this.tryLoad(this.filePath);
+    if (primary.kind === 'ok') return primary.config;
+    if (primary.kind === 'missing') {
+      // Losing the main file but keeping the backup is exactly what an
+      // interrupted write looks like. Prefer the backup over starting empty.
+      const backup = await this.tryLoad(this.backupPath);
+      if (backup.kind === 'ok') return backup.config;
+      return null;
+    }
+
+    // The main file exists and is unreadable. Quarantine it, then fall back.
+    const quarantine = `${this.filePath}.invalid-${Date.now()}`;
+    await rename(this.filePath, quarantine).catch(() => {});
+    const backup = await this.tryLoad(this.backupPath);
+    if (backup.kind === 'ok') return backup.config;
+    throw new InvalidConfigError(quarantine, primary.detail);
+  }
+
+  private async tryLoad(
+    path: string,
+  ): Promise<
+    { kind: 'ok'; config: DeskConfig } | { kind: 'missing' } | { kind: 'invalid'; detail: string }
+  > {
     let raw: string;
     try {
-      raw = await readFile(this.filePath, 'utf8');
+      raw = await readFile(path, 'utf8');
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return { kind: 'missing' };
       throw error;
     }
 
-    // Migrate before validating: an older config does not satisfy the current
-    // schema by definition.
-    const migrated = migrateDeskConfig(JSON.parse(raw));
-    const parsed = DeskConfigSchema.safeParse(migrated.config);
-    if (!parsed.success) {
-      // Never silently discard a user's desk. Keep the bad file aside so it can
-      // be inspected, and let the caller fall back to defaults.
-      const quarantine = `${this.filePath}.invalid-${Date.now()}`;
-      await rename(this.filePath, quarantine);
-      throw new InvalidConfigError(quarantine, parsed.error.message);
+    try {
+      const migrated = migrateDeskConfig(JSON.parse(raw));
+      const parsed = DeskConfigSchema.safeParse(migrated.config);
+      if (!parsed.success) return { kind: 'invalid', detail: parsed.error.message };
+      return { kind: 'ok', config: parsed.data };
+    } catch (error) {
+      return { kind: 'invalid', detail: (error as Error).message };
     }
-    return parsed.data;
   }
 
-  /** Atomic: write a temp file next to the target, then rename over it. */
+  /**
+   * Atomic *and* durable.
+   *
+   * A plain write-then-rename is atomic but not durable: the rename can reach
+   * the directory before the file's contents reach the disk, so an SD card
+   * losing power mid-write can leave an empty or truncated config where a good
+   * one used to be. The Pi this runs on loses power without warning, and this
+   * file is the only thing on it that cannot be re-derived from hardware.
+   *
+   * So: fsync the contents before the rename, keep the previous good copy as a
+   * backup, and fsync the directory afterwards so the rename itself survives.
+   */
   async save(config: DeskConfig): Promise<void> {
     DeskConfigSchema.parse(config);
-    await mkdir(dirname(this.filePath), { recursive: true });
-    const temporary = join(
-      dirname(this.filePath),
-      `.${Date.now()}-${Math.random().toString(36).slice(2)}.tmp`,
-    );
-    await writeFile(temporary, `${JSON.stringify(config, null, 2)}\n`, 'utf8');
+    const directory = dirname(this.filePath);
+    await mkdir(directory, { recursive: true });
+
+    const temporary = join(directory, `.${Date.now()}-${Math.random().toString(36).slice(2)}.tmp`);
+
+    const handle = await open(temporary, 'w');
+    try {
+      await handle.writeFile(`${JSON.stringify(config, null, 2)}\n`, 'utf8');
+      await handle.sync();
+    } finally {
+      await handle.close();
+    }
+
+    // Copy rather than rename, so there is never a moment with no config at all.
+    await copyFile(this.filePath, this.backupPath).catch(() => {});
+
     await rename(temporary, this.filePath);
+    await syncDirectory(directory);
+  }
+}
+
+/**
+ * Makes a rename durable. Best effort: Windows cannot open a directory this
+ * way, and the guarantee is only needed on the Pi.
+ */
+async function syncDirectory(directory: string): Promise<void> {
+  let handle;
+  try {
+    handle = await open(directory, 'r');
+    await handle.sync();
+  } catch {
+    // Not supported here; the contents fsync above is still the important half.
+  } finally {
+    await handle?.close().catch(() => {});
   }
 }
 

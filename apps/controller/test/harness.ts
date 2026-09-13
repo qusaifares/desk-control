@@ -63,6 +63,7 @@ export async function createHarness(
     DESK_CONTROL_HEARTBEAT_INTERVAL_MS: '500',
     DESK_CONTROL_OBSERVE_INTERVAL_MS: '150',
     DESK_CONTROL_AGENT_TIMEOUT_MS: '4000',
+    DESK_CONTROL_RETRY_DELAY_MS: '150',
     ...(options.pairingToken ? { DESK_CONTROL_PAIRING_TOKEN: options.pairingToken } : {}),
   } as NodeJS.ProcessEnv);
 

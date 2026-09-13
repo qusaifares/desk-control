@@ -267,8 +267,16 @@ export class SimulatedDesk {
     return { ok: true };
   }
 
+  /**
+   * Remembers only what actually happened.
+   *
+   * Idempotency means not repeating a side effect, not refusing to try again
+   * after a failure - caching a failure under its command id would make every
+   * retry return the same stale "no", forever. The real providers behave the
+   * same way.
+   */
   private finish(commandId: string, outcome: SwitchOutcome): SwitchOutcome {
-    this.completedCommands.set(commandId, outcome);
+    if (outcome.ok) this.completedCommands.set(commandId, outcome);
     return outcome;
   }
 }
