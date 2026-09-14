@@ -19,6 +19,21 @@ body {
   font-size: var(--text-base);
   -webkit-font-smoothing: antialiased;
   color-scheme: dark;
+  /*
+   * A touch panel, not a document: a finger sliding across it is never trying
+   * to select text, and on the panel every pan used to highlight something.
+   * Text fields opt back in below so renaming still works.
+   */
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+input,
+textarea,
+[contenteditable] {
+  -webkit-user-select: text;
+  user-select: text;
 }
 
 button {
