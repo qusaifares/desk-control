@@ -9,27 +9,37 @@ driven over DDC/CI by agents on the computers that are cabled to them.
 
 ## What you need
 
-- A Raspberry Pi 4 or 5 (ARM64), power supply, SD card
-- Raspberry Pi OS **Bookworm** or newer, 64-bit
+- A Raspberry Pi 4 or 5 (ARM64), power supply, and an SD card or USB stick
+- Raspberry Pi OS 64-bit **with desktop**, Bookworm or Trixie (verified on Trixie, Pi 5)
 - The panel, on HDMI or DSI
-- Node 20+
+- Node 22+ (24 recommended)
 
 ## 1. Flash the card
 
 Use Raspberry Pi Imager and set the hostname, your user, Wi-Fi and SSH in the imager's advanced
-options before writing — it saves a keyboard-and-monitor round trip. `deskpi.local` is a reasonable
-hostname.
+options before writing — it saves a keyboard-and-monitor round trip. The examples below use
+`desk-hub`; substitute whatever you chose.
+
+No SD card reader? Flash a USB stick instead and boot with the SD slot empty. A Pi 5 does this out
+of the box; a Pi 4 may need its bootloader updated first.
+
+Check the power supply is adequate before going further. `0x0` means no undervoltage or throttling
+has happened since boot:
+
+```bash
+vcgencmd get_throttled && vcgencmd pmic_read_adc EXT5V_V
+```
 
 ## 2. Install Node
 
 ```bash
-curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash - && sudo apt install -y nodejs
+curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash - && sudo apt install -y nodejs
 ```
 
 ## 3. Install the controller
 
 ```bash
-git clone git@github.com:qusaifares/desk-control.git && cd desk-control
+git clone https://github.com/qusaifares/desk-control.git && cd desk-control
 ```
 
 ```bash
@@ -54,15 +64,14 @@ port. The per-agent-key design that replaces it is in [protocol.md](protocol.md)
 On the Windows PC:
 
 ```bash
-DESK_CONTROL_URL=ws://deskpi.local:7420/agent DESK_CONTROL_PAIRING_TOKEN=<token> node apps/agent/dist/index.js
+DESK_CONTROL_URL=ws://desk-hub.local:7420/agent DESK_CONTROL_PAIRING_TOKEN=<token> node apps/agent/dist/index.js
 ```
 
 Its monitors should appear on the panel within a few seconds.
 
 ## 5. The display
 
-The panel is a 1920×440 strip, which is not a mode most drivers offer by default. On Bookworm, KMS
-takes the mode from the kernel command line — append to the single line in
+The panel is a 1920×440 strip, which is not a mode most drivers offer by default. KMS takes the mode from the kernel command line — append to the single line in
 `/boot/firmware/cmdline.txt`:
 
 ```
@@ -90,7 +99,7 @@ systemctl --user enable --now desk-kiosk
 ```
 
 It waits for the controller's health endpoint before launching, so a cold boot does not flash an
-error page. On Pi OS Lite with no desktop, run `cage -- chromium-browser --kiosk --app=http://127.0.0.1:7420/`
+error page. On Pi OS Lite with no desktop, run `cage -- chromium --kiosk --app=http://127.0.0.1:7420/`
 instead.
 
 Blank the cursor and stop the screen sleeping:
@@ -98,6 +107,9 @@ Blank the cursor and stop the screen sleeping:
 ```bash
 sudo apt install -y unclutter && echo 'unclutter -idle 0 &' >> ~/.config/labwc/autostart
 ```
+
+Not yet verified on the real panel: current Pi OS runs labwc on Wayland, where `unclutter` (an X11
+tool) may not hide the cursor, and the kiosk unit's `DISPLAY=:0` relies on Xwayland.
 
 ## Operating it
 

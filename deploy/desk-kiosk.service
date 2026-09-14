@@ -11,7 +11,9 @@ PartOf=graphical-session.target
 Type=simple
 Environment=DISPLAY=:0
 ExecStartPre=/bin/sh -c 'until curl -sf http://127.0.0.1:7420/api/health >/dev/null; do sleep 1; done'
-ExecStart=/usr/bin/chromium-browser \
+# Raspberry Pi OS renamed chromium-browser to chromium in Trixie; take whichever exists.
+# $$ is systemd's escape for a literal $ handed to the shell.
+ExecStart=/bin/sh -c 'exec "$$(command -v chromium || command -v chromium-browser)" "$$@"' chromium \
   --kiosk \
   --app=http://127.0.0.1:7420/ \
   --noerrdialogs \

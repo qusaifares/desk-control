@@ -23,19 +23,39 @@ fi
 
 echo "==> Checking Node"
 if ! command -v node >/dev/null 2>&1; then
-  echo "Node is not installed. Install Node 20 or newer first:" >&2
-  echo "  curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash - && sudo apt install -y nodejs" >&2
+  echo "Node is not installed. Install the current LTS first:" >&2
+  echo "  curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash - && sudo apt install -y nodejs" >&2
   exit 1
 fi
 node_major="$(node -p 'process.versions.node.split(".")[0]')"
-if [ "$node_major" -lt 20 ]; then
-  echo "Node $node_major is too old; this needs 20 or newer." >&2
+if [ "$node_major" -lt 22 ]; then
+  echo "Node $node_major is out of support; install 22 or newer (24 recommended)." >&2
   exit 1
 fi
 echo "    node $(node -v) on $(uname -m)"
 
+for tool in rsync curl; do
+  if ! command -v "$tool" >/dev/null 2>&1; then
+    echo "==> Installing $tool"
+    apt-get install -y "$tool"
+  fi
+done
+
+echo "==> Checking pnpm"
+# corepack writes its shims next to the node binary, which only root can do.
+# Enabling it as the build user fails with a permission error, so do it here.
+if ! command -v pnpm >/dev/null 2>&1; then
+  if command -v corepack >/dev/null 2>&1; then
+    corepack enable
+  else
+    # Node 25 stopped bundling corepack.
+    pnpm_version="$(node -p 'require("'"$REPO_DIR"'/package.json").packageManager.split("@")[1]')"
+    npm install -g "pnpm@$pnpm_version"
+  fi
+fi
+
 echo "==> Building (this takes a few minutes on a Pi)"
-sudo -u "$SERVICE_USER" bash -lc "cd '$REPO_DIR' && corepack enable >/dev/null 2>&1 || true; pnpm install --frozen-lockfile && pnpm build"
+sudo -u "$SERVICE_USER" bash -lc "cd '$REPO_DIR' && COREPACK_ENABLE_DOWNLOAD_PROMPT=0 pnpm install --frozen-lockfile && pnpm build"
 
 echo "==> Installing to $INSTALL_DIR"
 mkdir -p "$INSTALL_DIR" "$DATA_DIR"
