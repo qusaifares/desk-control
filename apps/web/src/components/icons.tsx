@@ -232,6 +232,20 @@ export function LinkIcon({ size = 20, className }: IconProps) {
   );
 }
 
+export function RefreshIcon({ size = 20, className }: IconProps) {
+  return (
+    <svg {...base(size)} className={className} aria-hidden="true">
+      <path
+        d="M20 12a8 8 0 1 1-2.34-5.66M20 4v4.5h-4.5"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 /** A computer's icon: what the user chose, else its platform. */
 export function computerIcon(
   computer: { platform: Platform; appearance?: { icon: string | null } },

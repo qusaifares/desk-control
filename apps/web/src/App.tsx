@@ -227,6 +227,7 @@ export function App() {
         <SystemSheet
           snapshot={snapshot}
           onClose={() => setSystemOpen(false)}
+          onReload={() => window.location.reload()}
           onRenameComputer={(computerId, customName) =>
             void run(() => deskApi.rename(computerId, customName))
           }

@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { Chip, ListRow, SectionLabel, Sheet, Stack, TextField } from '../design/index.js';
 import { COLORWAYS, colorwaySwatch } from '../lib/appearance.js';
 import { displayNameOf } from '../lib/desk.js';
-import { CHOOSABLE_ICONS, computerIcon, iconByName } from './icons.js';
+import { CHOOSABLE_ICONS, computerIcon, iconByName, RefreshIcon } from './icons.js';
 
 interface Props {
   snapshot: DeskSnapshot;
@@ -12,6 +12,11 @@ interface Props {
     computerId: string,
     patch: { icon?: string | null; colorway?: string | null },
   ) => void;
+  /**
+   * Reloads the page. A kiosk browser has no address bar and the panel has no
+   * keyboard, so this is the only way to pick up a new UI after an update.
+   */
+  onReload: () => void;
   onClose: () => void;
 }
 
@@ -24,7 +29,13 @@ interface Props {
  * survives the agent restarting - and it never touches the computer's identity,
  * which stays derived from the machine itself.
  */
-export function SystemSheet({ snapshot, onRenameComputer, onSetAppearance, onClose }: Props) {
+export function SystemSheet({
+  snapshot,
+  onRenameComputer,
+  onSetAppearance,
+  onReload,
+  onClose,
+}: Props) {
   const [renamingId, setRenamingId] = useState<string | null>(null);
 
   const renaming = renamingId
@@ -184,6 +195,15 @@ export function SystemSheet({ snapshot, onRenameComputer, onSetAppearance, onClo
             hideChevron
           />
         ))}
+
+        <SectionLabel>This panel</SectionLabel>
+        <ListRow
+          icon={<RefreshIcon />}
+          title="Reload panel"
+          subtitle="Picks up a new version after an update. The desk is not affected."
+          hideChevron
+          onClick={onReload}
+        />
       </Stack>
     </Sheet>
   );

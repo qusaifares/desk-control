@@ -29,6 +29,7 @@ function renderSheet(snapshot: DeskSnapshot = makeSnapshot({ observedId: 'comput
     snapshot,
     onRenameComputer: vi.fn(),
     onSetAppearance: vi.fn(),
+    onReload: vi.fn(),
     onClose: vi.fn(),
   };
   render(<SystemSheet {...props} />);
@@ -36,6 +37,12 @@ function renderSheet(snapshot: DeskSnapshot = makeSnapshot({ observedId: 'comput
 }
 
 describe('SystemSheet', () => {
+  it('offers a reload, since a kiosk browser has no other way to refresh', () => {
+    const props = renderSheet();
+    fireEvent.click(screen.getByText('Reload panel'));
+    expect(props.onReload).toHaveBeenCalledTimes(1);
+  });
+
   it('lists every computer, including ones with no agent', () => {
     renderSheet();
     expect(screen.getByText('Gaming PC')).toBeDefined();
