@@ -9,6 +9,7 @@ interface Props {
   snapshot: DeskSnapshot;
   monitor: Monitor;
   onRename: (customName: string | null) => void;
+  onSetOrientation: (orientation: 'landscape' | 'portrait') => void;
   onSetWiring: (inputId: string, computerId: string | null) => void;
   onDeclareComputer: (name: string, platform: Platform, inputId: string) => void;
   onClose: () => void;
@@ -34,6 +35,7 @@ export function MonitorEditorSheet({
   snapshot,
   monitor,
   onRename,
+  onSetOrientation,
   onSetWiring,
   onDeclareComputer,
   onClose,
@@ -155,6 +157,24 @@ export function MonitorEditorSheet({
           onSubmit={(value) => onRename(value)}
           {...(monitor.customName ? { onClear: () => onRename(null), clearLabel: 'Clear' } : {})}
         />
+
+        {monitor.placement ? (
+          <>
+            <span className="ds-field-label">Orientation</span>
+            <TileGrid>
+              <Tile
+                label="Landscape"
+                selected={monitor.placement.orientation === 'landscape'}
+                onClick={() => onSetOrientation('landscape')}
+              />
+              <Tile
+                label="Portrait"
+                selected={monitor.placement.orientation !== 'landscape'}
+                onClick={() => onSetOrientation('portrait')}
+              />
+            </TileGrid>
+          </>
+        ) : null}
 
         <span className="ds-field-label">Inputs</span>
         {monitor.inputs.map((input) => {

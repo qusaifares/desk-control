@@ -330,6 +330,23 @@ is why it lands with the macOS work.
 It is a hardware fact, so it is never persisted: it is re-learned from scratch on every boot rather
 than surviving a re-cabled desk.
 
+## Desk layout comes from the OS display arrangement
+
+No monitor knows where it physically sits, but the OS knows where the user put it, and people match
+that to reality so the pointer crosses at the right edge. The Windows bridge reads each display's
+position and rotation with `EnumDisplaySettings`, not the monitor rect: the bridge process is not DPI
+aware, so a panel at 150% scaling reports a shrunken rect with an origin still in physical pixels,
+which opens a phantom gap between stacked monitors.
+
+Pixels still cannot be positions. A 27" 4K panel is 3840 pixels wide and a 27" 1440p panel is 2560,
+yet they are the same width on the desk. `arrangeFromDesktop()` sizes each panel from its EDID
+diagonal and rebuilds positions edge by edge, averaging every neighbour a panel touches because
+mixed densities disagree about offsets along a shared edge.
+
+An arrangement replaces only a missing placement or a discovery-order guess. It never moves a user's
+placement, and never re-arranges one it already made - two computers with different arrangements of
+the same panels would otherwise shuffle the map on every reconnect.
+
 ## Recommended next milestone: two agents on one panel
 
 Verify the macOS provider on a real MacBook, then cable that Mac to a monitor the Windows PC also

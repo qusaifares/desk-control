@@ -8,6 +8,7 @@ function renderSheet(overrides: Partial<Parameters<typeof MonitorEditorSheet>[0]
     snapshot: makeSnapshot({ observedId: 'computer:pc' }),
     monitor: testMonitor,
     onRename: vi.fn(),
+    onSetOrientation: vi.fn(),
     onSetWiring: vi.fn(),
     onDeclareComputer: vi.fn(),
     onClose: vi.fn(),
@@ -18,6 +19,15 @@ function renderSheet(overrides: Partial<Parameters<typeof MonitorEditorSheet>[0]
 }
 
 describe('MonitorEditorSheet', () => {
+  it('rotates a landscape monitor to portrait', () => {
+    const props = renderSheet();
+    expect(screen.getByText('Landscape').closest('button')?.getAttribute('aria-pressed')).toBe(
+      'true',
+    );
+    fireEvent.click(screen.getByText('Portrait'));
+    expect(props.onSetOrientation).toHaveBeenCalledWith('portrait');
+  });
+
   it('lists every input with what is currently plugged into it', () => {
     renderSheet();
     expect(screen.getByText('DisplayPort 1')).toBeDefined();

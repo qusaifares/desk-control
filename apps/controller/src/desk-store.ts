@@ -1,10 +1,12 @@
 import { emptyOverride, type DeskConfig, type EntityOverride } from '@desk-control/config';
 import {
+  arrangeFromDesktop,
   captureDeskState,
   displayName,
   slugify,
   unionCapabilities,
   type Agent,
+  type ArrangementEntry,
   type Computer,
   type ConnectivityState,
   type DeskCommand,
@@ -34,6 +36,8 @@ interface ObservationRecord {
 }
 
 const MAX_RETAINED_COMMANDS = 100;
+/** Grid units between groups of monitors that were placed separately. */
+const PLACEMENT_GAP = 1;
 
 /**
  * Authoritative in-memory desk state.
@@ -86,6 +90,11 @@ export class DeskStore {
    * every boot rather than surviving a re-cabled desk.
    */
   private readonly provenActiveInputIndependence = new Set<string>();
+  /**
+   * agentId -> how that computer's OS arranges the monitors it drives. Kept so
+   * "auto-arrange" can rebuild the map on request; a hint, never persisted.
+   */
+  private readonly desktopArrangements = new Map<string, ArrangementEntry[]>();
 
   desired: DesiredState = { monitorSources: {}, peripheralOwners: {}, activePresetId: null };
 
@@ -252,6 +261,8 @@ export class DeskStore {
     computerId: string,
     reports: readonly MonitorReport[],
   ): void {
+    this.recordDesktopArrangement(agentId, reports);
+
     for (const report of reports) {
       const existing = this.monitors.get(report.stableId);
       const inputs = this.mergeInputs(report, existing, computerId);
@@ -271,7 +282,7 @@ export class DeskStore {
           !this.provenActiveInputIndependence.has(`${report.stableId}:${agentId}`),
       });
 
-      this.ensurePlacement(report.stableId);
+      this.ensurePlacement(report.stableId, report.identity.physicalSizeInches);
 
       const monitor: Monitor = {
         id: report.stableId,
@@ -295,22 +306,24 @@ export class DeskStore {
    * Gives a newly discovered monitor somewhere to live on the desk map.
    *
    * Without this, a real desk starts with an empty map and every monitor listed
-   * as "not placed yet", which is useless on a touchscreen. Auto-placement lays
-   * them out in a row and marks them, so the first thing the user does is drag
-   * them into the right shape rather than build the desk from nothing.
+   * as "not placed yet", which is useless on a touchscreen. This is the last
+   * resort - the end of a row - for a monitor no OS arrangement covers. Its
+   * `autoBasis` marks it as a guess an arrangement may replace.
    *
    * A placement the user has already made is never overwritten.
    */
-  private ensurePlacement(monitorId: string): void {
+  private ensurePlacement(monitorId: string, physicalSizeInches: number | null): void {
     if (this.config.layout.placements[monitorId]) return;
 
+    // Sized in inches like arranged monitors, so the two sit sensibly together.
+    const diagonal = physicalSizeInches ?? 27;
+    const width = Math.round(((diagonal * 16) / Math.hypot(16, 9)) * 2) / 2;
+    const height = Math.round(((diagonal * 9) / Math.hypot(16, 9)) * 2) / 2;
     const existing = Object.values(this.config.layout.placements);
-    const width = 16;
-    const height = 9;
-    const gap = 1;
-    const nextX = existing.reduce((rightEdge, placement) => {
-      return Math.max(rightEdge, placement.x + placement.width + gap);
-    }, 0);
+    const nextX = existing.reduce(
+      (rightEdge, placement) => Math.max(rightEdge, placement.x + placement.width + PLACEMENT_GAP),
+      0,
+    );
 
     this.config.layout.placements[monitorId] = {
       x: nextX,
@@ -319,13 +332,131 @@ export class DeskStore {
       height,
       orientation: 'landscape',
       autoPlaced: true,
+      autoBasis: 'discovery-order',
     };
+    this.fitGrid();
+    this.markConfigDirty();
+  }
+
+  /** Remembers an agent's desktop arrangement and places monitors from it. */
+  private recordDesktopArrangement(agentId: string, reports: readonly MonitorReport[]): void {
+    const entries = reports.flatMap((report) =>
+      report.desktopBounds
+        ? [
+            {
+              monitorId: report.stableId,
+              bounds: report.desktopBounds,
+              physicalSizeInches: report.identity.physicalSizeInches,
+            },
+          ]
+        : [],
+    );
+    if (entries.length === 0) {
+      this.desktopArrangements.delete(agentId);
+      return;
+    }
+    this.desktopArrangements.set(agentId, entries);
+    this.applyDesktopArrangement(entries);
+  }
+
+  /**
+   * Places monitors the way one computer's OS arranges them.
+   *
+   * Only monitors with no placement, or a discovery-order guess, are moved.
+   * A user's placement is never touched, and neither is one already made from
+   * an arrangement - otherwise two computers that arrange the same panels
+   * differently would shuffle the map every time either reconnected. When some
+   * of the group are already placed, the rest are positioned relative to them.
+   */
+  private applyDesktopArrangement(entries: readonly ArrangementEntry[]): void {
+    const placements = this.config.layout.placements;
+    const replaceable = new Set(
+      entries
+        .map((entry) => entry.monitorId)
+        .filter((id) => {
+          const placement = placements[id];
+          return !placement || (placement.autoPlaced && placement.autoBasis !== 'os-arrangement');
+        }),
+    );
+    if (replaceable.size === 0) return;
+
+    const arranged = arrangeFromDesktop(entries);
+    const anchor = arranged.find((entry) => !replaceable.has(entry.monitorId));
+    let offsetX = 0;
+    let offsetY = 0;
+    if (anchor) {
+      const kept = placements[anchor.monitorId]!;
+      offsetX = kept.x - anchor.x;
+      offsetY = kept.y - anchor.y;
+    } else {
+      offsetX = Object.entries(placements)
+        .filter(([id]) => !replaceable.has(id))
+        .reduce(
+          (rightEdge, [, placement]) =>
+            Math.max(rightEdge, placement.x + placement.width + PLACEMENT_GAP),
+          0,
+        );
+    }
+
+    for (const entry of arranged) {
+      if (!replaceable.has(entry.monitorId)) continue;
+      const placement: Placement = {
+        x: entry.x + offsetX,
+        y: entry.y + offsetY,
+        width: entry.width,
+        height: entry.height,
+        orientation: entry.orientation,
+        autoPlaced: true,
+        autoBasis: 'os-arrangement',
+      };
+      placements[entry.monitorId] = placement;
+      const monitor = this.monitors.get(entry.monitorId);
+      if (monitor) monitor.placement = placement;
+    }
+    this.fitGrid();
+    this.markConfigDirty();
+  }
+
+  /**
+   * Discards every placement and lays the desk out again from what the agents
+   * report. The user asked for this, so their own placements go too.
+   */
+  resetLayout(): void {
+    this.config.layout.placements = {};
+    for (const entries of this.desktopArrangements.values()) {
+      this.applyDesktopArrangement(entries);
+    }
+    for (const monitor of this.monitors.values()) {
+      this.ensurePlacement(monitor.id, monitor.identity.physicalSizeInches);
+      monitor.placement = this.config.layout.placements[monitor.id] ?? null;
+    }
+    this.fitGrid();
+    this.markConfigDirty();
+  }
+
+  /**
+   * Sizes the grid to the placements, so the map is the desk and not the desk
+   * plus wherever monitors used to be. Shifts everything if a placement went
+   * negative, which relative placement can do.
+   */
+  private fitGrid(): void {
+    const all = Object.values(this.config.layout.placements);
+    if (all.length === 0) return;
+
+    const minX = Math.min(...all.map((placement) => placement.x));
+    const minY = Math.min(...all.map((placement) => placement.y));
+    if (minX < 0 || minY < 0) {
+      // In place: monitors hold references to these same objects.
+      for (const placement of all) {
+        placement.x -= Math.min(minX, 0);
+        placement.y -= Math.min(minY, 0);
+      }
+    }
 
     this.config.layout.grid = {
-      columns: Math.max(this.config.layout.grid.columns, nextX + width),
-      rows: Math.max(this.config.layout.grid.rows, height),
+      columns: Math.max(...all.map((placement) => placement.x + placement.width)),
+      rows: Math.max(...all.map((placement) => placement.y + placement.height)),
     };
-    this.markConfigDirty();
   }
 
   /**
@@ -713,14 +844,18 @@ export class DeskStore {
     const monitor = this.monitors.get(monitorId);
     if (!monitor) return false;
 
-    const stored: Placement = { ...placement, autoPlaced: false };
+    const stored: Placement = {
+      x: placement.x,
+      y: placement.y,
+      width: placement.width,
+      height: placement.height,
+      orientation: placement.orientation,
+      autoPlaced: false,
+    };
     this.config.layout.placements[monitorId] = stored;
     monitor.placement = stored;
 
-    this.config.layout.grid = {
-      columns: Math.max(this.config.layout.grid.columns, Math.ceil(stored.x + stored.width)),
-      rows: Math.max(this.config.layout.grid.rows, Math.ceil(stored.y + stored.height)),
-    };
+    this.fitGrid();
     this.markConfigDirty();
     return true;
   }

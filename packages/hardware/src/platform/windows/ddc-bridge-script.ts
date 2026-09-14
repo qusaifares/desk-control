@@ -69,6 +69,18 @@ public static class DeskDdc {
     [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 128)] public string DeviceKey;
   }
 
+  [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+  public struct DEVMODE {
+    [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)] public string dmDeviceName;
+    public short dmSpecVersion, dmDriverVersion, dmSize, dmDriverExtra;
+    public int dmFields, dmPositionX, dmPositionY, dmDisplayOrientation, dmDisplayFixedOutput;
+    public short dmColor, dmDuplex, dmYResolution, dmTTOption, dmCollate;
+    [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)] public string dmFormName;
+    public short dmLogPixels;
+    public int dmBitsPerPel, dmPelsWidth, dmPelsHeight, dmDisplayFlags, dmDisplayFrequency;
+    public int dmICMMethod, dmICMIntent, dmMediaType, dmDitherType, dmReserved1, dmReserved2, dmPanningWidth, dmPanningHeight;
+  }
+
   public delegate bool MonitorEnumProc(IntPtr hMonitor, IntPtr hdc, IntPtr lprc, IntPtr data);
 
   [DllImport("user32.dll")]
@@ -77,6 +89,8 @@ public static class DeskDdc {
   public static extern bool GetMonitorInfoW(IntPtr hMonitor, ref MONITORINFOEX info);
   [DllImport("user32.dll", CharSet = CharSet.Unicode)]
   public static extern bool EnumDisplayDevicesW(string device, uint devNum, ref DISPLAY_DEVICE dd, uint flags);
+  [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+  public static extern bool EnumDisplaySettingsW(string device, int mode, ref DEVMODE dm);
 
   [DllImport("dxva2.dll", SetLastError = true)]
   public static extern bool GetNumberOfPhysicalMonitorsFromHMONITOR(IntPtr h, ref uint count);
@@ -110,6 +124,22 @@ function Get-Displays {
     $mi.cbSize = [System.Runtime.InteropServices.Marshal]::SizeOf($mi)
     if (-not [DeskDdc]::GetMonitorInfoW($h, [ref]$mi)) { continue }
 
+    # Position and rotation from the current display mode rather than the
+    # monitor rect: this process is not DPI aware, so a scaled panel's rect
+    # comes back resized while its origin stays in physical pixels.
+    $desktop = $null
+    $dm = New-Object DeskDdc+DEVMODE
+    $dm.dmSize = [System.Runtime.InteropServices.Marshal]::SizeOf($dm)
+    if ([DeskDdc]::EnumDisplaySettingsW($mi.szDevice, -1, [ref]$dm) -and $dm.dmPelsWidth -gt 0) {
+      $desktop = [pscustomobject]@{
+        x        = $dm.dmPositionX
+        y        = $dm.dmPositionY
+        width    = $dm.dmPelsWidth
+        height   = $dm.dmPelsHeight
+        rotation = $dm.dmDisplayOrientation * 90
+      }
+    }
+
     $count = [uint32]0
     if (-not [DeskDdc]::GetNumberOfPhysicalMonitorsFromHMONITOR($h, [ref]$count)) { continue }
     if ($count -eq 0) { continue }
@@ -132,6 +162,7 @@ function Get-Displays {
         DeviceId     = $deviceId
         DeviceString = $deviceString
         IsPrimary    = ($mi.dwFlags -band 1) -eq 1
+        Desktop      = $desktop
       }
       $index = $index + 1
     }
@@ -241,6 +272,7 @@ function Invoke-List {
       capabilities          = $caps
       capabilitiesError     = $capsError
       fallbackDisambiguator = $d.Adapter
+      desktop               = $d.Desktop
     }
   }
   return [pscustomobject]@{ monitors = @($monitors); edid = @($edid) }

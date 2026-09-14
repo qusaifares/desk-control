@@ -48,6 +48,7 @@ export const deskApi = {
     post('/api/desk/override', { entityId, customName }),
   setPlacement: (monitorId: string, placement: PlacementInput) =>
     post('/api/desk/layout', { monitorId, placement }),
+  resetLayout: () => post('/api/desk/layout/reset', {}),
   setWiring: (monitorId: string, inputId: string, computerId: string | null) =>
     post('/api/desk/wiring', { monitorId, inputId, computerId }),
   declareComputer: (detectedName: string, platform: Platform) =>

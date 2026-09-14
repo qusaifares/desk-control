@@ -5,6 +5,7 @@ export * from './device.js';
 export * from './monitor.js';
 export * from './peripheral.js';
 export * from './layout.js';
+export * from './arrangement.js';
 export * from './state.js';
 export * from './command.js';
 export * from './reconcile.js';

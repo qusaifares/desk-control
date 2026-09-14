@@ -1,6 +1,6 @@
 import type { DeskSnapshot, Monitor, Placement } from '@desk-control/domain';
 import { useCallback, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
-import { EmptyState } from '../design/index.js';
+import { Button, EmptyState } from '../design/index.js';
 import type { PlacementInput } from '../lib/api.js';
 import { MonitorIcon } from './icons.js';
 import { MonitorTile } from './MonitorTile.js';
@@ -10,6 +10,7 @@ interface Props {
   editing: boolean;
   onSelectMonitor: (monitor: Monitor) => void;
   onMoveMonitor: (monitorId: string, placement: PlacementInput) => void;
+  onResetLayout: () => void;
 }
 
 interface DragState {
@@ -34,11 +35,20 @@ const snap = (value: number) => Math.round(value / SNAP) * SNAP;
  * component state - a gesture, not desk state - and is committed to the
  * controller on release; the next snapshot is what makes it real.
  */
-export function DeskMap({ snapshot, editing, onSelectMonitor, onMoveMonitor }: Props) {
+export function DeskMap({
+  snapshot,
+  editing,
+  onSelectMonitor,
+  onMoveMonitor,
+  onResetLayout,
+}: Props) {
   const { columns, rows } = snapshot.layout.grid;
   const mapRef = useRef<HTMLDivElement>(null);
   const [drag, setDrag] = useState<DragState | null>(null);
   const [preview, setPreview] = useState<{ id: string; placement: Placement } | null>(null);
+  // Two taps, because it throws away placements the user made by hand and the
+  // panel has no undo.
+  const [confirmingReset, setConfirmingReset] = useState(false);
 
   const toGrid = useCallback(
     (event: { clientX: number; clientY: number }) => {
@@ -145,9 +155,25 @@ export function DeskMap({ snapshot, editing, onSelectMonitor, onMoveMonitor }: P
         ))}
       </div>
       {editing ? (
-        <p className="desk-map-note">
-          Drag a display to arrange it. Tap one to rename it or say what is plugged into each input.
-        </p>
+        <div className="desk-map-note">
+          <span>
+            Drag a display to arrange it. Tap one to rotate or rename it, or to say what is plugged
+            into each input.
+          </span>
+          <Button
+            variant={confirmingReset ? 'primary' : 'default'}
+            onClick={() => {
+              if (!confirmingReset) {
+                setConfirmingReset(true);
+                return;
+              }
+              setConfirmingReset(false);
+              onResetLayout();
+            }}
+          >
+            {confirmingReset ? 'Replace my layout' : 'Auto-arrange'}
+          </Button>
+        </div>
       ) : autoPlaced.length > 0 ? (
         <p className="desk-map-note">
           {autoPlaced.length} display{autoPlaced.length === 1 ? ' was' : 's were'} placed

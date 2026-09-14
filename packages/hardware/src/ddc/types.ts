@@ -24,6 +24,11 @@ export interface DdcMonitorEntry {
   capabilitiesError: string | null;
   /** Used for identity only when the panel reports no usable serial. */
   fallbackDisambiguator: string;
+  /**
+   * Where the OS puts this display on its desktop, in physical pixels. Absent
+   * from helpers that cannot read it.
+   */
+  desktop?: { x: number; y: number; width: number; height: number; rotation: number } | null;
 }
 
 /**

@@ -1,4 +1,8 @@
-import type { MonitorCapability } from '@desk-control/domain';
+import {
+  DesktopBoundsSchema,
+  type DesktopBounds,
+  type MonitorCapability,
+} from '@desk-control/domain';
 import type { MonitorReport, ObservedMonitorReport } from '@desk-control/protocol';
 import type {
   MonitorControlProvider,
@@ -22,7 +26,13 @@ import {
 import { parseEdidHex, type EdidIdentity } from './edid.js';
 import { buildDdcMonitorIdentity, normalizeDeviceKey } from './identity.js';
 import { type BridgeRequestError } from './process-bridge.js';
-import type { DdcBridge, DdcGetVcpResponse, DdcListResponse, DdcObserveResponse } from './types.js';
+import type {
+  DdcBridge,
+  DdcGetVcpResponse,
+  DdcListResponse,
+  DdcMonitorEntry,
+  DdcObserveResponse,
+} from './types.js';
 
 interface KnownMonitor {
   stableId: string;
@@ -49,6 +59,12 @@ export interface DdcProviderOptions {
 function asArray<T>(value: T[] | T | null | undefined): T[] {
   if (value === null || value === undefined) return [];
   return Array.isArray(value) ? value : [value];
+}
+
+/** A helper's desktop rect, if it is complete enough to lay a desk out from. */
+function desktopBoundsOf(desktop: DdcMonitorEntry['desktop']): DesktopBounds | null {
+  const parsed = DesktopBoundsSchema.safeParse(desktop);
+  return parsed.success ? parsed.data : null;
 }
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
@@ -189,6 +205,7 @@ export class DdcMonitorControlProvider implements MonitorControlProvider {
         // send commands into a void and report success that never happened.
         requiresActiveInput: true,
         preferredInputId: null,
+        desktopBounds: desktopBoundsOf(entry.desktop),
       });
     }
 

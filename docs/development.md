@@ -200,7 +200,10 @@ The provider is chosen automatically: `windows-ddc` on Windows **and under WSL**
 belong to Windows and the bridge reaches them through `powershell.exe`). Override with `--provider`.
 macOS and Linux still exit with a clear message — those providers are stubs.
 
-Real monitors are auto-placed in a row on the desk map, marked `autoPlaced`, ready to be arranged.
+Real monitors are auto-placed from the Windows display arrangement (Settings → Display): position,
+portrait rotation and relative size, marked `autoPlaced`. A monitor no agent reports an arrangement
+for goes on the end of a row instead. Drag to correct either; **Auto-arrange** in edit mode rebuilds
+the map from scratch.
 
 ### First-run config
 

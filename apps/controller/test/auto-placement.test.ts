@@ -93,3 +93,101 @@ describe('auto placement on a fresh desk', () => {
     expect(JSON.stringify(store.config.layout.placements)).toBe(before);
   });
 });
+
+describe('placement from the OS desktop arrangement', () => {
+  // Captured from a real Windows desk; see arrangement.test.ts in domain.
+  const portrait = report('monitor:portrait', {
+    identity: { ...report('x').identity, physicalSizeInches: 27 },
+    desktopBounds: { x: -1440, y: -1403, width: 1440, height: 2560, rotation: 90 },
+  });
+  const top = report('monitor:top', {
+    identity: { ...report('x').identity, physicalSizeInches: 27 },
+    desktopBounds: { x: 0, y: -2160, width: 3840, height: 2160, rotation: 0 },
+  });
+  const bottom = report('monitor:bottom', {
+    identity: { ...report('x').identity, physicalSizeInches: 27 },
+    desktopBounds: { x: 0, y: 0, width: 2560, height: 1440, rotation: 0 },
+  });
+
+  const placementOf = (store: DeskStore, id: string) => store.monitors.get(id)!.placement!;
+
+  it('lays a fresh desk out the way Windows has it, portrait included', () => {
+    const store = new DeskStore(emptyDeskConfig());
+    store.applyMonitorReports('agent:a', 'computer:a', [top, bottom, portrait]);
+
+    const left = placementOf(store, 'monitor:portrait');
+    const upper = placementOf(store, 'monitor:top');
+    const lower = placementOf(store, 'monitor:bottom');
+    expect(left.orientation).toBe('portrait-left');
+    expect(upper.x).toBe(left.x + left.width);
+    expect(lower.y).toBe(upper.y + upper.height);
+    expect(upper.autoBasis).toBe('os-arrangement');
+    expect(store.config.layout.grid).toEqual({
+      columns: upper.x + upper.width,
+      rows: lower.y + lower.height,
+    });
+  });
+
+  it('replaces a discovery-order guess once an arrangement arrives', () => {
+    const store = new DeskStore(emptyDeskConfig());
+    const withoutBounds = [top, bottom, portrait].map((entry) => ({
+      ...entry,
+      desktopBounds: null,
+    }));
+    store.applyMonitorReports('agent:a', 'computer:a', withoutBounds);
+    expect(placementOf(store, 'monitor:portrait').orientation).toBe('landscape');
+
+    store.applyMonitorReports('agent:a', 'computer:a', [top, bottom, portrait]);
+    expect(placementOf(store, 'monitor:portrait').orientation).toBe('portrait-left');
+  });
+
+  it('keeps an arranged desk still when a second computer arranges it differently', () => {
+    const store = new DeskStore(emptyDeskConfig());
+    store.applyMonitorReports('agent:a', 'computer:a', [top, bottom]);
+    const before = JSON.stringify(store.config.layout.placements);
+
+    // Computer B has the same two side by side.
+    store.applyMonitorReports('agent:b', 'computer:b', [
+      { ...top, desktopBounds: { x: 0, y: 0, width: 3840, height: 2160, rotation: 0 } },
+      { ...bottom, desktopBounds: { x: 3840, y: 0, width: 2560, height: 1440, rotation: 0 } },
+    ]);
+    expect(JSON.stringify(store.config.layout.placements)).toBe(before);
+  });
+
+  it('never moves a monitor the user placed, and arranges new ones around it', () => {
+    const config = emptyDeskConfig();
+    config.layout.placements['monitor:bottom'] = {
+      x: 40,
+      y: 30,
+      width: 23.5,
+      height: 13.5,
+      orientation: 'landscape',
+      autoPlaced: false,
+    };
+    const store = new DeskStore(config);
+    store.applyMonitorReports('agent:a', 'computer:a', [top, bottom]);
+
+    const lower = placementOf(store, 'monitor:bottom');
+    const upper = placementOf(store, 'monitor:top');
+    expect(lower).toMatchObject({ x: 40, y: 30, autoPlaced: false });
+    expect(upper.x).toBe(40);
+    expect(upper.y + upper.height).toBe(30);
+  });
+
+  it('auto-arrange throws away the user layout and rebuilds it', () => {
+    const store = new DeskStore(emptyDeskConfig());
+    store.applyMonitorReports('agent:a', 'computer:a', [top, bottom, portrait]);
+    const arranged = JSON.stringify(store.config.layout.placements);
+
+    store.setPlacement('monitor:portrait', {
+      x: 60,
+      y: 0,
+      width: 23.5,
+      height: 13,
+      orientation: 'landscape',
+      autoPlaced: false,
+    });
+    store.resetLayout();
+    expect(JSON.stringify(store.config.layout.placements)).toBe(arranged);
+  });
+});

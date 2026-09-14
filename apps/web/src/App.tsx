@@ -134,6 +134,7 @@ export function App() {
               onMoveMonitor={(monitorId, placement) =>
                 void run(() => deskApi.setPlacement(monitorId, placement))
               }
+              onResetLayout={() => void run(() => deskApi.resetLayout())}
             />
           </>
         }
@@ -177,6 +178,22 @@ export function App() {
           monitor={selectedMonitor}
           onClose={() => setSelectedMonitorId(null)}
           onRename={(customName) => void run(() => deskApi.rename(selectedMonitor.id, customName))}
+          onSetOrientation={(orientation) => {
+            const placement = selectedMonitor.placement;
+            if (!placement) return;
+            const isPortrait = placement.orientation !== 'landscape';
+            if (isPortrait === (orientation === 'portrait')) return;
+            // Turning a panel swaps its footprint; it pivots on its top-left corner.
+            void run(() =>
+              deskApi.setPlacement(selectedMonitor.id, {
+                x: placement.x,
+                y: placement.y,
+                width: placement.height,
+                height: placement.width,
+                orientation: orientation === 'portrait' ? 'portrait-left' : 'landscape',
+              }),
+            );
+          }}
           onSetWiring={(inputId, computerId) =>
             void run(() => deskApi.setWiring(selectedMonitor.id, inputId, computerId))
           }

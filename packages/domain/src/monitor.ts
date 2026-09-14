@@ -69,6 +69,14 @@ export const PlacementSchema = z.object({
    * treats it differently.
    */
   autoPlaced: z.boolean().default(false),
+  /**
+   * What an automatic placement was based on. A monitor dropped at the end of a
+   * row is a guess worth replacing as soon as an OS arrangement arrives; one
+   * placed from an arrangement is kept, so two computers with different
+   * arrangements cannot shuffle the map back and forth. Absent for a user's
+   * placement, and on auto placements written before this existed.
+   */
+  autoBasis: z.enum(['discovery-order', 'os-arrangement']).optional(),
 });
 export type Placement = z.infer<typeof PlacementSchema>;
 

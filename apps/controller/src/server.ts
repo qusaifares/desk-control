@@ -306,6 +306,12 @@ export async function createServer(options: {
     return { accepted: true, commandIds: [], skipped: [] };
   });
 
+  // Deliberately destructive: the user asked to throw their layout away.
+  app.post('/api/desk/layout/reset', async () => {
+    store.resetLayout();
+    return { accepted: true, commandIds: [], skipped: [] };
+  });
+
   app.post('/api/desk/wiring', async (request, reply) => {
     const parsed = SetWiringRequestSchema.safeParse(request.body);
     if (!parsed.success) {

@@ -147,8 +147,16 @@
 }
 
 .desk-map-note {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
   font-size: var(--text-sm);
   color: var(--text-tertiary);
+}
+
+.desk-map-note > span {
+  min-width: 0;
 }
 
 .monitor {

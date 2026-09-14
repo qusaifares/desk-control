@@ -174,6 +174,10 @@ supersede an in-flight input switch on the same monitor.
   user declare a console or an un-instrumented laptop, and the switch is carried out by whichever
   agent holds DDC access to that monitor.
 - Desired state is saved on shutdown but **never re-applied on boot**.
+- **Desk layout is seeded from the OS display arrangement**, which is a hint, not a reading. It only
+  replaces a missing placement or a `discovery-order` guess (`Placement.autoBasis`); a user's
+  placement and an existing `os-arrangement` one are left alone. Positions come from physical
+  pixels via `EnumDisplaySettings`, never the DPI-virtualised monitor rect.
 
 ## Current state
 

@@ -52,6 +52,8 @@ export class MockMonitorControlProvider implements MonitorControlProvider {
         connectedViaInputId: ownInput?.id ?? null,
         requiresActiveInput: monitor.requiresActiveInput,
         preferredInputId: monitor.preferredInputId,
+        // A simulated desk has no OS desktop to read an arrangement from.
+        desktopBounds: null,
       } satisfies MonitorReport;
     });
   }

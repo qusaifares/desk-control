@@ -1,5 +1,6 @@
 import {
   ConnectorSchema,
+  DesktopBoundsSchema,
   DisplayModeSchema,
   MonitorCapabilitySchema,
   PowerStateSchema,
@@ -49,6 +50,11 @@ export const MonitorReportSchema = z.object({
   /** Most monitors only answer DDC on the currently displayed input. */
   requiresActiveInput: z.boolean().default(true),
   preferredInputId: z.string().nullable().default(null),
+  /**
+   * Where this computer's OS puts the monitor on its desktop. Optional: added
+   * after v1, and a platform that cannot read it leaves it null.
+   */
+  desktopBounds: DesktopBoundsSchema.nullable().default(null),
 });
 export type MonitorReport = z.infer<typeof MonitorReportSchema>;
 
