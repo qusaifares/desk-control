@@ -1,9 +1,15 @@
 import type { DeskSnapshot, Monitor, Placement } from '@desk-control/domain';
-import { useCallback, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
+import {
+  useCallback,
+  useMemo,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+} from 'react';
 import { Button, EmptyState } from '../design/index.js';
 import type { PlacementInput } from '../lib/api.js';
 import { MonitorIcon } from './icons.js';
-import { MonitorTile } from './MonitorTile.js';
+import { MonitorTile, type MapView } from './MonitorTile.js';
 
 interface Props {
   snapshot: DeskSnapshot;
@@ -28,6 +34,35 @@ const SNAP = 0.5;
 const snap = (value: number) => Math.round(value / SNAP) * SNAP;
 
 /**
+ * The map frames the monitors, not the stored grid.
+ *
+ * Placements only mean something relative to each other, and the grid only
+ * ever grows at the right and bottom. Nudge the whole desk right and the grid
+ * keeps an empty strip on the left; the map is centred as a box, so the
+ * monitors sat visibly off centre. Cropping here fixes the picture without
+ * rewriting anyone's saved positions.
+ *
+ * Computed from the snapshot, never the drag preview, so the frame holds still
+ * under a finger mid-drag and settles once the move is saved.
+ */
+function viewOf(snapshot: DeskSnapshot): MapView {
+  const placements = snapshot.monitors.flatMap((monitor) =>
+    monitor.placement ? [monitor.placement] : [],
+  );
+  if (placements.length === 0) {
+    return { originX: 0, originY: 0, ...snapshot.layout.grid };
+  }
+  const originX = Math.min(...placements.map((placement) => placement.x));
+  const originY = Math.min(...placements.map((placement) => placement.y));
+  return {
+    originX,
+    originY,
+    columns: Math.max(...placements.map((placement) => placement.x + placement.width)) - originX,
+    rows: Math.max(...placements.map((placement) => placement.y + placement.height)) - originY,
+  };
+}
+
+/**
  * The physical desk map. Positions come entirely from the layout in config, so
  * a desk with two monitors or nine renders with no code change.
  *
@@ -42,7 +77,8 @@ export function DeskMap({
   onMoveMonitor,
   onResetLayout,
 }: Props) {
-  const { columns, rows } = snapshot.layout.grid;
+  const view = useMemo(() => viewOf(snapshot), [snapshot]);
+  const { columns, rows } = view;
   const mapRef = useRef<HTMLDivElement>(null);
   const [drag, setDrag] = useState<DragState | null>(null);
   const [preview, setPreview] = useState<{ id: string; placement: Placement } | null>(null);
@@ -152,6 +188,7 @@ export function DeskMap({
             monitor={monitor}
             editing={editing}
             placement={preview?.id === monitor.id ? preview.placement : null}
+            view={view}
             onPointerDown={onPointerDown(monitor)}
             onSelect={() => {
               // A drag is not a tap.

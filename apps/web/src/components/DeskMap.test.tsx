@@ -58,3 +58,37 @@ describe('DeskMap dragging', () => {
     expect(props.onSelectMonitor).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('DeskMap framing', () => {
+  it('frames the monitors, not empty grid left of them', () => {
+    const base = makeSnapshot({ observedId: 'computer:pc' });
+    const snapshot = {
+      ...base,
+      layout: { ...base.layout, grid: { columns: 100, rows: 100 } },
+      monitors: base.monitors.map((monitor) => ({
+        ...monitor,
+        placement: {
+          x: 40,
+          y: 20,
+          width: 10,
+          height: 10,
+          orientation: 'landscape' as const,
+          autoPlaced: false,
+        },
+      })),
+    };
+    render(
+      <DeskMap
+        snapshot={snapshot}
+        editing={false}
+        onSelectMonitor={vi.fn()}
+        onMoveMonitor={vi.fn()}
+        onResetLayout={vi.fn()}
+      />,
+    );
+    const tile = document.querySelector('.desk-map .monitor') as HTMLElement;
+    expect(tile.style.left).toBe('0%');
+    expect(tile.style.top).toBe('0%');
+    expect(tile.style.width).toBe('100%');
+  });
+});

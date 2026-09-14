@@ -18,6 +18,15 @@ interface Props {
   placement?: Placement | null;
   editing?: boolean;
   onPointerDown?: (event: React.PointerEvent) => void;
+  /** The part of the grid the map shows. Defaults to the whole layout grid. */
+  view?: MapView;
+}
+
+export interface MapView {
+  originX: number;
+  originY: number;
+  columns: number;
+  rows: number;
 }
 
 /**
@@ -38,11 +47,16 @@ export function MonitorTile({
   placement: placementOverride,
   editing,
   onPointerDown,
+  view,
 }: Props) {
   const placement = placementOverride ?? monitor.placement;
   if (!placement) return null;
 
-  const { columns, rows } = snapshot.layout.grid;
+  const { originX, originY, columns, rows } = view ?? {
+    originX: 0,
+    originY: 0,
+    ...snapshot.layout.grid,
+  };
   const resolution = snapshot.resolutions.monitors[monitor.id];
   const status = resolution?.status ?? 'unknown';
 
@@ -65,8 +79,8 @@ export function MonitorTile({
       data-status={status}
       onPointerDown={onPointerDown}
       style={{
-        left: `${(placement.x / columns) * 100}%`,
-        top: `${(placement.y / rows) * 100}%`,
+        left: `${((placement.x - originX) / columns) * 100}%`,
+        top: `${((placement.y - originY) / rows) * 100}%`,
         width: `${(placement.width / columns) * 100}%`,
         height: `${(placement.height / rows) * 100}%`,
       }}
