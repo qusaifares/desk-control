@@ -51,3 +51,10 @@ ul {
   padding: 0;
   list-style: none;
 }
+
+/* The kiosk panel is touch-only; a pointer parked on it is just clutter. */
+:root[data-kiosk] *,
+:root[data-kiosk] *::before,
+:root[data-kiosk] *::after {
+  cursor: none !important;
+}

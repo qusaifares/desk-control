@@ -120,7 +120,7 @@ Point each agent at it, with the pairing token:
   DESK_CONTROL_PAIRING_TOKEN=$token
 
 Logs:    journalctl -u desk-controller -f
-Kiosk:   see docs/raspberry-pi.md
+Kiosk:   bash scripts/install-kiosk.sh   (as your user, no sudo)
 DONE
 else
   echo "Controller failed to start. Check: journalctl -u desk-controller -n 50" >&2

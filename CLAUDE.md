@@ -218,6 +218,10 @@ switch over GPIO. It does not run an agent - it has no monitors of its own.
 `scripts/install-pi.sh` builds, installs a systemd service and generates a pairing token.
 `docs/raspberry-pi.md` covers the display mode and kiosk browser. The panel is 1920x440.
 
+The kiosk starts from labwc's autostart (`scripts/install-kiosk.sh`), not a systemd user unit:
+Raspberry Pi OS runs labwc on Wayland and never activates `graphical-session.target`, and there is no
+X display. `?kiosk` in the URL hides the pointer.
+
 This is the first time the controller binds beyond localhost, because agents have to reach it. The
 installer therefore generates a pairing token rather than leaving it open. Be honest about what that
 is: a shared secret over plain HTTP on a trusted LAN. Never forward the port.

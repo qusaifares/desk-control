@@ -71,45 +71,52 @@ Its monitors should appear on the panel within a few seconds.
 
 ## 5. The display
 
-The panel is a 1920×440 strip, which is not a mode most drivers offer by default. KMS takes the mode from the kernel command line — append to the single line in
+Check what the panel reports before changing anything:
+
+```bash
+kmsprint | head -10
+```
+
+The 1920×440 panel on this desk advertises its own mode and came up at `1920x440@60.00` with no
+configuration at all. Only if yours does not, force it by appending to the single line in
 `/boot/firmware/cmdline.txt`:
 
 ```
 video=HDMI-A-1:1920x440M@60
 ```
 
-Check what the panel actually reports before forcing anything:
-
-```bash
-kmsprint 2>/dev/null || modetest -c 2>/dev/null | head -40
-```
-
-If the panel is mounted rotated, rotate the compositor rather than the browser — a rotated browser
-window still reports the unrotated viewport, and the layout keys off viewport size. On labwc, set
-`output` rotation in `~/.config/labwc/rc.xml`; on Wayfire, `transform` in `~/.config/wayfire.ini`.
+If the panel is mounted rotated, rotate the output in the desktop's Screen Configuration tool rather
+than rotating the browser: a rotated browser window still reports the unrotated viewport, and the
+layout keys off viewport size.
 
 ## 6. Kiosk
 
-```bash
-mkdir -p ~/.config/systemd/user && cp deploy/desk-kiosk.service ~/.config/systemd/user/
-```
+Run as your desktop user, **without sudo**:
 
 ```bash
-systemctl --user enable --now desk-kiosk
+bash scripts/install-kiosk.sh && sudo reboot
 ```
 
-It waits for the controller's health endpoint before launching, so a cold boot does not flash an
-error page. On Pi OS Lite with no desktop, run `cage -- chromium --kiosk --app=http://127.0.0.1:7420/`
-instead.
+Raspberry Pi OS logs in automatically and runs labwc on Wayland. The script installs
+`~/.local/bin/desk-kiosk` and makes it the whole of `~/.config/labwc/autostart`, so the Pi boots
+straight into the panel. The launcher waits for the controller's health endpoint so a cold boot
+does not open on an error page, and restarts Chromium if it ever exits.
 
-Blank the cursor and stop the screen sleeping:
+Why not a systemd user service: on this desktop `graphical-session.target` is never activated, so a
+unit waiting on it silently never starts, and there is no X display for `DISPLAY=:0` to reach. That
+was the first design and it would have shown a blank desktop with no error.
+
+Replacing the autostart also drops the taskbar, desktop background and screen blanking, none of
+which belong on a kiosk. Your previous autostart is kept, and this undoes it:
 
 ```bash
-sudo apt install -y unclutter && echo 'unclutter -idle 0 &' >> ~/.config/labwc/autostart
+bash scripts/install-kiosk.sh --remove
 ```
 
-Not yet verified on the real panel: current Pi OS runs labwc on Wayland, where `unclutter` (an X11
-tool) may not hide the cursor, and the kiosk unit's `DISPLAY=:0` relies on Xwayland.
+The launcher opens the UI with `?kiosk`, which hides the pointer — labwc draws one even on a
+touch-only panel, and X11 tools like `unclutter` do nothing on Wayland.
+
+On Pi OS Lite with no desktop, run `cage -- chromium --kiosk http://127.0.0.1:7420/?kiosk` instead.
 
 ## Operating it
 
