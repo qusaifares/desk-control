@@ -159,6 +159,10 @@
   min-width: 0;
 }
 
+.desk-map-note > button {
+  flex-shrink: 0;
+}
+
 .monitor {
   position: absolute;
   container-type: size;

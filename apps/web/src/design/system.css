@@ -440,7 +440,10 @@ button.ds-tile:active:not(:disabled) {
   border-radius: var(--radius-md);
   border: 1px solid var(--border-subtle);
   background: var(--surface-2);
+  /* Its own colour, or it inherits a muted caption's and looks disabled. */
+  color: var(--text-primary);
   font-weight: var(--weight-medium);
+  white-space: nowrap;
   transition: background var(--duration-fast) var(--ease-out);
 }
 
