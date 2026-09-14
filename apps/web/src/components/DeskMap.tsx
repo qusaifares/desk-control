@@ -49,6 +49,12 @@ export function DeskMap({
   // Two taps, because it throws away placements the user made by hand and the
   // panel has no undo.
   const [confirmingReset, setConfirmingReset] = useState(false);
+  /*
+   * The browser fires click *after* pointerup, by which point endDrag has
+   * already cleared the drag. State cannot carry "that was a drag" across to
+   * the click, so a ref does, and the click consumes it.
+   */
+  const suppressNextClick = useRef(false);
 
   const toGrid = useCallback(
     (event: { clientX: number; clientY: number }) => {
@@ -102,6 +108,7 @@ export function DeskMap({
 
   const endDrag = useCallback(() => {
     if (!drag) return;
+    suppressNextClick.current = drag.moved;
     if (drag.moved && preview) {
       onMoveMonitor(drag.monitorId, {
         x: preview.placement.x,
@@ -148,7 +155,10 @@ export function DeskMap({
             onPointerDown={onPointerDown(monitor)}
             onSelect={() => {
               // A drag is not a tap.
-              if (drag?.moved) return;
+              if (suppressNextClick.current) {
+                suppressNextClick.current = false;
+                return;
+              }
               onSelectMonitor(monitor);
             }}
           />
